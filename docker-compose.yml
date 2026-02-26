@@ -1,0 +1,38 @@
+services:
+  postgis:
+    image: imresamu/postgis:latest
+    container_name: geofence-postgis
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis}
+      POSTGRES_DB: ${POSTGRES_DB:-gis}
+    ports:
+      - ${POSTGRES_PORT:-5432}:5432
+    volumes:
+      - postgis_data:/var/lib/postgresql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gis} -d ${POSTGRES_DB:-gis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+
+  osm2pgsql:
+    build:
+      context: .
+      dockerfile: docker/osm2pgsql/Dockerfile
+    platform: linux/arm64
+    profiles:
+      - tools
+    depends_on:
+      postgis:
+        condition: service_healthy
+    working_dir: /work
+    entrypoint: ["osm2pgsql"]
+    volumes:
+      - ./:/work
+
+volumes:
+  postgis_data:
