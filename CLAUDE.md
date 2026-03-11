@@ -21,5 +21,4 @@ tools/                               ← import-osm.sh, osium.sh, explain-batch.
 profiler/                            ← @geofence/profiler library
 ```
 
-The old `scripts/`, `k6/`, and `docs/` directories have been removed.
-`pg` is now a root-level dependency (root `package.json`) — no separate `scripts/package.json`.
+`pg` is now a root-level dependency (root `package.json`)
