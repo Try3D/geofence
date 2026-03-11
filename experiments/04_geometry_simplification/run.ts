@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 /**
- * Benchmarks simplified-geometry endpoints vs the original table.
+ * Benchmarks simplified-geometry vs the original table.
  * Simplified tables must exist in the DB (see db/migrations/).
  *
- * Endpoints tested:
- *   /api/polygons/batch          — original geometry
- *   /api/polygons/batch-simple10 — simple_10 (10 m tolerance)
+ * Endpoint tested:
+ *   /api/polygons/batch with table parameter
+ *     - table=original (or omit) -> planet_osm_polygon
+ *     - table=planet_osm_polygon_simple_10 -> simplified geometry
  */
 
 import path from "path";
@@ -52,8 +53,8 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-simple10",
-        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_10" }),
       },
     },
     {
@@ -62,8 +63,8 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-simple10",
-        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_10" }),
       },
     },
   ],
