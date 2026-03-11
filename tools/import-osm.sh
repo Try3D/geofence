@@ -13,11 +13,11 @@ if [[ -f ".env" ]]; then
 fi
 
 IMPORT_MODE="create"
-DB_HOST="${POSTGRES_HOST:-localhost}"
-DB_PORT="${POSTGRES_PORT:-5432}"
-DB_USER="${POSTGRES_USER:-gis}"
-DB_PASSWORD="${POSTGRES_PASSWORD:-gis}"
-DB_NAME="${POSTGRES_DB:-gis}"
+DB_HOST="${PGHOST:-localhost}"
+DB_PORT="${PGPORT:-5432}"
+DB_USER="${PGUSER:-gis}"
+DB_PASSWORD="${PGPASSWORD:-gis}"
+DB_NAME="${PGDATABASE:-gis}"
 CACHE_MB="${OSM2PGSQL_CACHE:-16000}"
 NUM_PROCESSES="${OSM2PGSQL_PROCS:-$(nproc 2>/dev/null || echo 4)}"
 PBF_PATHS=()
@@ -85,9 +85,15 @@ DATABASE_URL="postgresql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_
 sqlx migrate run --source db/migrations --database-url "$DATABASE_URL"
 
 OSM2PGSQL_CMD=(
-  docker compose run --rm
+  docker run --rm
+  --network host
   -e "PGPASSWORD=${DB_PASSWORD}"
-  osm2pgsql
+  -v "$(pwd):/work"
+  debian:bookworm-slim
+  bash -c "apt-get update -qq && apt-get install -y -qq osm2pgsql && osm2pgsql"
+)
+
+OSM2PGSQL_CMD+=(
   "--${IMPORT_MODE}"
   --slim
   --hstore

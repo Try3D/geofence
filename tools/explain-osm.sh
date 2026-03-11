@@ -29,29 +29,22 @@ for PBF_PATH in "$@"; do
     exit 1
   fi
 
-  CONTAINER_PATH="/work/${PBF_PATH#./}"
+  HOST_FILE="$(pwd)/${PBF_PATH#./}"
+  HOST_DIR="$(dirname "$HOST_FILE")"
+  FILENAME="$(basename "$HOST_FILE")"
 
   echo "========================================="
   echo "File: $PBF_PATH"
   echo "========================================="
 
-  if docker compose run --rm osm2pgsql which osmium > /dev/null 2>&1; then
-    echo "Using osmium from osm2pgsql image..."
-    docker compose run --rm osm2pgsql osmium fileinfo -e "$CONTAINER_PATH"
-  else
-    echo "osmium not found in osm2pgsql image, installing via ubuntu:24.04..."
-    HOST_FILE="$(pwd)/${PBF_PATH#./}"
-    HOST_DIR="$(dirname "$HOST_FILE")"
-    FILENAME="$(basename "$HOST_FILE")"
-    docker run --rm \
-      -v "${HOST_DIR}:/data" \
-      ubuntu:24.04 \
-      bash -c "
-        apt-get update -qq &&
-        apt-get install -y -qq osmium-tool &&
-        osmium fileinfo -e /data/${FILENAME}
-      "
-  fi
+  docker run --rm \
+    -v "${HOST_DIR}:/data" \
+    debian:bookworm-slim \
+    bash -c "
+      apt-get update -qq &&
+      apt-get install -y -qq osmium-tool &&
+      osmium fileinfo -e /data/${FILENAME}
+    "
 
   echo ""
 done

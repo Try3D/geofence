@@ -50,19 +50,5 @@ services:
       retries: 10
       start_period: 5s
 
-  osm2pgsql:
-    build:
-      context: .
-      dockerfile: docker/osm2pgsql/Dockerfile
-    platform: linux/arm64
-    profiles:
-      - tools
-    working_dir: /work
-    entrypoint: ["osm2pgsql"]
-    extra_hosts:
-      - "localhost:host-gateway"
-    volumes:
-      - ./:/work
-
 volumes:
   postgis_data:
