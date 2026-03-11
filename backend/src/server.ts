@@ -389,22 +389,20 @@ app.post("/api/polygons/batch-temp", async (req: Request, res: Response) => {
     }
 
     // Perform set-based spatial join with aggregation
-    const joinQuery = `
-      SELECT bp.idx::int,
-             array_agg(
-               json_build_object('osm_id', p.osm_id::text, 'name', COALESCE(p.name, p.tags->'name'))
-               ORDER BY p.osm_id
-             ) AS matches
-      FROM batch_points bp
-      JOIN ${table} p ON ST_Covers(p.way, bp.geom)
-      GROUP BY bp.idx
-      ORDER BY bp.idx
-      LIMIT $1
-    `;
-    const result = await client.query<{ idx: number; matches: Array<{ osm_id: string; name: string | null }> }>(
-      joinQuery,
-      [limit * points.length]
-    );
+     const joinQuery = `
+       SELECT bp.idx::int,
+              array_agg(
+                json_build_object('osm_id', p.osm_id::text, 'name', COALESCE(p.name, p.tags->'name'))
+                ORDER BY p.osm_id
+              ) AS matches
+       FROM batch_points bp
+       JOIN ${table} p ON ST_Covers(p.way, bp.geom)
+       GROUP BY bp.idx
+       ORDER BY bp.idx
+     `;
+     const result = await client.query<{ idx: number; matches: Array<{ osm_id: string; name: string | null }> }>(
+       joinQuery
+     );
 
     // Commit transaction (temp table auto-drops)
     await client.query("COMMIT");
