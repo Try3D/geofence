@@ -65,6 +65,3 @@ node experiments/02_batch_vs_single/run.js
 |--------|---------|
 | `tools/import-osm.sh` | Import a `.osm.pbf` file via osm2pgsql |
 | `tools/osium.sh` | Inspect a `.osm.pbf` file with osmium |
-| `tools/explain-batch.js` | Print EXPLAIN ANALYZE for the batch LATERAL query |
-| `tools/monte-carlo.js` | Adaptive bounding-box finder (maximises hit rate) |
-| `tools/node-worker.js` | Fire a single batch request and print sample results |
