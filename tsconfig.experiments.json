@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./experiments_dist",
+    "rootDir": "./experiments",
+    "target": "ES2022",
+    "module": "ES2022",
+    "skipLibCheck": true
+  },
+  "include": ["experiments/**/*.ts"],
+  "exclude": ["node_modules"]
+}

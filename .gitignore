@@ -4,6 +4,10 @@ raw/
 # Benchmark results
 benchmark-results/
 
+# Build output (compiled JavaScript)
+**/dist/
+experiments_dist/
+
 # Environment variables
 .env
 
