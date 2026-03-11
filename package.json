@@ -1,0 +1,13 @@
+{
+  "name": "geofence",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "profiler"
+  ],
+  "dependencies": {
+    "@geofence/profiler": "*",
+    "pg": "^8.20.0"
+  }
+}

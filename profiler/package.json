@@ -1,0 +1,10 @@
+{
+  "name": "@geofence/profiler",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": {
+    ".": "./index.js",
+    "./k6-runner": "./k6-runner.js"
+  }
+}

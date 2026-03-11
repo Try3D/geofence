@@ -1,5 +1,14 @@
 # Ignore raw data files
 raw/
 
+# Benchmark results
+benchmark-results/
+
 # Environment variables
 .env
+
+# MacOS Specific
+.DS_Store
+
+# Package manager
+node_modules/

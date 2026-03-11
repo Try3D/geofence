@@ -8,16 +8,47 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis}
       POSTGRES_DB: ${POSTGRES_DB:-gis}
     ports:
-      - ${POSTGRES_PORT:-5432}:5432
+      - "5432:5432"
     volumes:
       - postgis_data:/var/lib/postgresql
-      - ./db/init:/docker-entrypoint-initdb.d:ro
+    command: >
+      postgres
+      -c shared_buffers=6GB
+      -c effective_cache_size=18GB
+      -c work_mem=64MB
+      -c maintenance_work_mem=1GB
+      -c max_wal_size=4GB
+      -c checkpoint_completion_target=0.9
+      -c random_page_cost=1.1
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-gis} -d ${POSTGRES_DB:-gis}"]
       interval: 10s
       timeout: 5s
       retries: 10
       start_period: 15s
+
+  pgbouncer:
+    image: pgbouncer/pgbouncer:latest
+    container_name: geofence-pgbouncer
+    restart: unless-stopped
+    depends_on:
+      postgis:
+        condition: service_healthy
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-gis}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis}
+      POSTGRES_DB: ${POSTGRES_DB:-gis}
+    ports:
+      - ${PGBOUNCER_PORT:-6432}:6432
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+    command: /etc/pgbouncer/pgbouncer.ini
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER:-gis}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 5s
 
   osm2pgsql:
     build:
@@ -26,11 +57,10 @@ services:
     platform: linux/arm64
     profiles:
       - tools
-    depends_on:
-      postgis:
-        condition: service_healthy
     working_dir: /work
     entrypoint: ["osm2pgsql"]
+    extra_hosts:
+      - "localhost:host-gateway"
     volumes:
       - ./:/work
 
