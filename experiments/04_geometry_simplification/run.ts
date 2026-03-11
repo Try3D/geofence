@@ -67,6 +67,72 @@ const bench = new Benchmark({
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_10" }),
       },
     },
+
+    // ── simple_100 (100 m tolerance) ──────────────────────────────────────
+    {
+      label: "simple_100 vus=5",
+      vus: 5,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_100" }),
+      },
+    },
+    {
+      label: "simple_100 vus=10",
+      vus: 10,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_100" }),
+      },
+    },
+
+    // ── simple_500 (500 m tolerance) ──────────────────────────────────────
+    {
+      label: "simple_500 vus=5",
+      vus: 5,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_500" }),
+      },
+    },
+    {
+      label: "simple_500 vus=10",
+      vus: 10,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_500" }),
+      },
+    },
+
+    // ── simple_1000 (1000 m tolerance) ───────────────────────────────────
+    {
+      label: "simple_1000 vus=5",
+      vus: 5,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_1000" }),
+      },
+    },
+    {
+      label: "simple_1000 vus=10",
+      vus: 10,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_1000" }),
+      },
+    },
   ],
 });
 

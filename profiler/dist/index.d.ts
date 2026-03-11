@@ -12,6 +12,10 @@ export interface BenchmarkMetrics {
     p99Latency: number;
     failureRate: number;
     totalRequests: number;
+    precision?: number;
+    recall?: number;
+    f1?: number;
+    perfectMatchPct?: number;
 }
 export interface BenchmarkResult {
     experiment: ExperimentConfig;

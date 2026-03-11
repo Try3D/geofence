@@ -21,6 +21,11 @@ export interface BenchmarkMetrics {
   p99Latency: number;
   failureRate: number;
   totalRequests: number;
+  // Optional accuracy metrics (for geometry simplification benchmarks)
+  precision?: number;
+  recall?: number;
+  f1?: number;
+  perfectMatchPct?: number;
 }
 
 export interface BenchmarkResult {

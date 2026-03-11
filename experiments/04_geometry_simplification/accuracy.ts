@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 
 /**
- * Monte Carlo accuracy analysis for geometry simplification levels.
+ * Accuracy analysis for geometry simplification levels using F1-score.
  *
  * Generates N random points, queries each simplification level directly via DB
- * (no HTTP, no k6), computes Intersection over Union (IoU) vs the original
- * geometry, and prints a summary table of accuracy + latency per level.
+ * (no HTTP, no k6), computes F1-score, Precision, and Recall vs the original
+ * geometry (ground truth), and prints a summary table.
  *
  * Run standalone — does NOT affect k6 benchmarks.
  */
@@ -82,13 +82,6 @@ async function queryLevel(
   return map;
 }
 
-function iou(setA: Set<string>, setB: Set<string>): number {
-  if (setA.size === 0 && setB.size === 0) return 1.0; // both agree: no match
-  const intersection = [...setA].filter((x) => setB.has(x)).length;
-  const union = new Set([...setA, ...setB]).size;
-  return intersection / union;
-}
-
 interface VertexStats {
   avg_pts: number;
   total_pts: string;
@@ -103,14 +96,74 @@ async function getVertexStats(table: string): Promise<VertexStats> {
   return res.rows[0];
 }
 
+interface AccuracyMetrics {
+  precision: number;
+  recall: number;
+  f1: number;
+  perfectMatchPct: number;
+}
+
+function calculateAccuracyMetrics(
+  groundTruth: Map<number, Set<string>>,
+  predicted: Map<number, Set<string>>,
+  numPoints: number
+): AccuracyMetrics {
+  let totalTp = 0;
+  let totalFp = 0;
+  let totalFn = 0;
+  let perfectMatches = 0;
+
+  for (let i = 1; i <= numPoints; i++) {
+    const gt = groundTruth.get(i) ?? new Set<string>();
+    const pred = predicted.get(i) ?? new Set<string>();
+
+    // True Positives: polygons in both sets
+    const tp = [...pred].filter((x) => gt.has(x)).length;
+    
+    // False Positives: polygons in predicted but not in ground truth
+    const fp = [...pred].filter((x) => !gt.has(x)).length;
+    
+    // False Negatives: polygons in ground truth but not in predicted
+    const fn = [...gt].filter((x) => !pred.has(x)).length;
+
+    totalTp += tp;
+    totalFp += fp;
+    totalFn += fn;
+
+    // Perfect match if TP == pred.size && TP == gt.size
+    if (tp === pred.size && tp === gt.size) {
+      perfectMatches++;
+    }
+  }
+
+  // Calculate Precision: TP / (TP + FP)
+  const precision = totalTp + totalFp > 0 
+    ? totalTp / (totalTp + totalFp)
+    : 1.0; // If no predictions, precision is perfect
+
+  // Calculate Recall: TP / (TP + FN)
+  const recall = totalTp + totalFn > 0
+    ? totalTp / (totalTp + totalFn)
+    : 1.0; // If no ground truth, recall is perfect
+
+  // Calculate F1: 2 * (Precision * Recall) / (Precision + Recall)
+  const f1 = precision + recall > 0
+    ? (2 * precision * recall) / (precision + recall)
+    : 1.0; // Both 0 means perfect match (no polygons)
+
+  const perfectMatchPct = (perfectMatches / numPoints) * 100;
+
+  return { precision, recall, f1, perfectMatchPct };
+}
+
 function formatTable(rows: string[][]): string {
   const headers = [
-    "level",
-    "Avg IoU",
-    "FP%",
-    "FN%",
-    "Empty match%",
-    "Avg verts",
+    "Level",
+    "Precision",
+    "Recall",
+    "F1-Score",
+    "Perfect%",
+    "Avg Verts",
     "Reduction",
     "Latency",
     "Speedup",
@@ -132,7 +185,7 @@ function formatTable(rows: string[][]): string {
 async function main() {
   await client.connect();
 
-  console.log(`\nGenerating ${N} random test points...`);
+  console.log(`\nGenerating ${N} random test points in France...`);
   const points = randomPoints(N);
   const lons = points.map((p) => p.lon);
   const lats = points.map((p) => p.lat);
@@ -170,7 +223,7 @@ async function main() {
       originalMap = resultMap;
       originalLatency = elapsed;
       levelResults.push({ level, resultMap, elapsed, vertStats });
-      console.log(`${elapsed.toFixed(0)}ms (baseline)`);
+      console.log(`${elapsed.toFixed(0)}ms (baseline, ground truth)`);
       continue;
     }
 
@@ -178,54 +231,18 @@ async function main() {
     console.log(`${elapsed.toFixed(0)}ms`);
   }
 
-  console.log("\nComputing accuracy metrics...\n");
+  console.log("\nComputing F1-score accuracy metrics...\n");
 
   const tableRows: string[][] = [];
 
   for (const { level, resultMap, elapsed, vertStats } of levelResults) {
-    const ious: number[] = [];
-    let fpCount = 0; // simplified has extra matches
-    let fnCount = 0; // simplified missed matches
-    let emptyBoth = 0; // both returned nothing
-
-    for (let i = 1; i <= N; i++) {
-      const orig = originalMap!.get(i) ?? new Set();
-      const simp = resultMap.get(i) ?? new Set();
-
-      if (orig.size === 0 && simp.size === 0) {
-        emptyBoth++;
-        ious.push(1.0);
-        continue;
-      }
-
-      ious.push(iou(orig, simp));
-
-      for (const id of simp) {
-        if (!orig.has(id)) fpCount++;
-      }
-      for (const id of orig) {
-        if (!simp.has(id)) fnCount++;
-      }
-    }
-
-    const avgIou = ious.reduce((a, b) => a + b, 0) / ious.length;
-    const totalMatches = [...originalMap!.values()].reduce(
-      (a, s) => a + s.size,
-      0
-    );
-    const fpRate =
-      totalMatches > 0
-        ? (fpCount / totalMatches * 100).toFixed(1) + "%"
-        : "-";
-    const fnRate =
-      totalMatches > 0
-        ? (fnCount / totalMatches * 100).toFixed(1) + "%"
-        : "-";
-    const emptyRate = ((emptyBoth / N) * 100).toFixed(1) + "%";
+    const metrics = calculateAccuracyMetrics(originalMap!, resultMap, N);
+    
     const reduction =
       level.name === "original"
         ? "0%"
         : ((1 - vertStats.avg_pts / origStats.avg_pts) * 100).toFixed(0) + "%";
+    
     const speedup =
       level.name === "original"
         ? "baseline"
@@ -233,10 +250,10 @@ async function main() {
 
     tableRows.push([
       level.name,
-      avgIou.toFixed(4),
-      fpRate,
-      fnRate,
-      emptyRate,
+      metrics.precision.toFixed(4),
+      metrics.recall.toFixed(4),
+      metrics.f1.toFixed(4),
+      metrics.perfectMatchPct.toFixed(1) + "%",
       String(vertStats.avg_pts ?? "?"),
       reduction,
       elapsed.toFixed(0) + "ms",
@@ -246,10 +263,16 @@ async function main() {
 
   console.log(formatTable(tableRows));
   console.log(
-    `Test points: ${N}  |  Bounding box: France (approx)`
+    `\nTest points: ${N}  |  Bounding box: France (approx)`
   );
   console.log(
-    `IoU=1.0 means perfect match. FP=false positives, FN=false negatives vs original.\n`
+    `Precision: TP / (TP + FP) - how many returned results were correct`
+  );
+  console.log(
+    `Recall: TP / (TP + FN) - how many correct results did we find`
+  );
+  console.log(
+    `F1-Score: harmonic mean of precision and recall (1.0 = perfect)\n`
   );
 
   await client.end();
