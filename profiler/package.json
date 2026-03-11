@@ -2,9 +2,21 @@
   "name": "@geofence/profiler",
   "version": "1.0.0",
   "type": "module",
-  "main": "index.js",
+  "main": "dist/index.js",
   "exports": {
-    ".": "./index.js",
-    "./k6-runner": "./k6-runner.js"
+    ".": "./dist/index.js",
+    "./presets": "./dist/presets.js",
+    "./utils": "./dist/utils.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.6.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.18.1",
+    "typescript": "^5.9.2"
   }
 }

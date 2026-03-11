@@ -11,80 +11,62 @@
 
 import path from "path";
 import { fileURLToPath } from "url";
-import { runProfiler, portKiller, processSpawner } from "@geofence/profiler";
+import { Benchmark, randomPoints, GEOFENCE_PRESETS } from "@geofence/profiler";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "../..");
-const PROFILER_DIR = path.join(ROOT, "profiler");
 
-const minLon = -2.937207, maxLon = 7.016791;
-const minLat = 43.238664, maxLat = 49.428801;
-
-function randomPoints(n) {
-  return Array.from({ length: n }, () => ({
-    lon: minLon + Math.random() * (maxLon - minLon),
-    lat: minLat + Math.random() * (maxLat - minLat),
-  }));
-}
-
-await runProfiler({
+const bench = new Benchmark({
   name: "Geometry Simplification Benchmark",
   resultsDir: path.join(ROOT, "benchmark-results", "04_geometry_simplification"),
 
-  services: {
-    backend: {
-      killFn:    portKiller(3000),
-      startFn:   processSpawner("npm", ["run", "dev"], path.join(ROOT, "backend")),
-      healthUrl: "http://localhost:3000/health",
-    },
-  },
-
-  k6: {
-    scriptPath: path.join(PROFILER_DIR, "k6-runner.js"),
-    duration:   "60s",
-  },
-
-  metrics: ["throughput", "pointLookups", "avgLatency", "p95Latency", "p99Latency", "failureRate"],
+  ...GEOFENCE_PRESETS,
 
   experiments: [
     // ── Original geometry ────────────────────────────────────────────────────
     {
       label: "original vus=5",
-      vus: 5, batchSize: 1000,
+      vus: 5,
+      batchSize: 1000,
       extraEnv: {
-        METHOD:     "POST",
+        METHOD: "POST",
         TARGET_URL: "http://localhost:3000/api/polygons/batch",
-        BODY:       JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
     {
       label: "original vus=10",
-      vus: 10, batchSize: 1000,
+      vus: 10,
+      batchSize: 1000,
       extraEnv: {
-        METHOD:     "POST",
+        METHOD: "POST",
         TARGET_URL: "http://localhost:3000/api/polygons/batch",
-        BODY:       JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
 
     // ── simple_10 (10 m tolerance) ────────────────────────────────────────
     {
       label: "simple_10 vus=5",
-      vus: 5, batchSize: 1000,
+      vus: 5,
+      batchSize: 1000,
       extraEnv: {
-        METHOD:     "POST",
+        METHOD: "POST",
         TARGET_URL: "http://localhost:3000/api/polygons/batch-simple10",
-        BODY:       JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
     {
       label: "simple_10 vus=10",
-      vus: 10, batchSize: 1000,
+      vus: 10,
+      batchSize: 1000,
       extraEnv: {
-        METHOD:     "POST",
+        METHOD: "POST",
         TARGET_URL: "http://localhost:3000/api/polygons/batch-simple10",
-        BODY:       JSON.stringify({ points: randomPoints(1000), limit: 20 }),
+        BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
   ],
 });
+
+await bench.run();
