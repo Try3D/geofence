@@ -38,11 +38,13 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-gis}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-gis}
       POSTGRES_DB: ${POSTGRES_DB:-gis}
+      DATABASES_HOST: postgis
+      DATABASES_PORT: 5432
+      DATABASES_USER: ${POSTGRES_USER:-gis}
+      DATABASES_PASSWORD: ${POSTGRES_PASSWORD:-gis}
+      DATABASES_DBNAME: ${POSTGRES_DB:-gis}
     ports:
-      - ${PGBOUNCER_PORT:-6432}:6432
-    volumes:
-      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
-    command: /etc/pgbouncer/pgbouncer.ini
+      - 5433:6432
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -p 6432 -U ${POSTGRES_USER:-gis}"]
       interval: 10s
