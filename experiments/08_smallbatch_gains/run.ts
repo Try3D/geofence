@@ -96,9 +96,9 @@ async function main() {
 
   // Write results
   const { writeFileSync, mkdirSync, existsSync } = await import("fs");
-  const { join } = await import("path");
+  const { join, resolve } = await import("path");
 
-  const resultsDir = "benchmark-results/08_smallbatch_gains";
+  const resultsDir = resolve(__dirname, "../../benchmark-results/08_smallbatch_gains");
 
   if (!existsSync(resultsDir)) {
     mkdirSync(resultsDir, { recursive: true });
