@@ -61,7 +61,7 @@ async function runBenchmark(): Promise<void> {
     console.log("=".repeat(50));
 
     for (const variant of VARIANTS) {
-      const endpoint = `/exp/10/${variant}`;
+      const endpoint = `/exp/08/${variant}`;
       const latencies: number[] = [];
 
       try {
@@ -118,7 +118,7 @@ async function runBenchmark(): Promise<void> {
 
   // Save results to file
   const fs = await import("fs");
-  const resultsDir = "/Users/rsaran/Projects/geofence/benchmark-results/10_sql_functions";
+  const resultsDir = "/Users/rsaran/Projects/geofence/benchmark-results/08_sql_functions";
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir, { recursive: true });
   }

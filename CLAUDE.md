@@ -63,25 +63,61 @@ This repo is experiment-driven. Backend route design and experiment scripts evol
 - Experiment scripts must use `API_BASE_URL` (default `http://localhost:3000`).
 - Put detailed results in each experiment README, not in root `README.md`.
 
+## Benchmarking Standard: Profiler + K6
+
+**ALL benchmarking MUST use the `Benchmark` class from `@geofence/profiler`.**
+
+This ensures:
+- Consistent load testing with k6 (configurable VUs, duration, thresholds)
+- Automatic metric extraction (throughput, p95, p99, avg/med latency, failure rate)
+- Standardized results format across all experiments
+- Proper JSON summary exports
+
+**Pattern:**
+```typescript
+import { Benchmark, randomPoints, GEOFENCE_PRESETS } from "@geofence/profiler";
+
+const bench = new Benchmark({
+  name: "Your Experiment Name",
+  resultsDir: path.join(ROOT, "benchmark-results", "NN_name"),
+  ...GEOFENCE_PRESETS,
+  experiments: [
+    {
+      label: "variant-name_1000_vus=10",
+      vus: 10,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: `${BASE_URL}/exp/NN/variant`,
+        BODY: JSON.stringify({ points: randomPoints(1000) }),
+      },
+    },
+    // ... more experiments
+  ],
+});
+
+await bench.run();
+```
+
+**Accuracy testing:** Create separate `accuracy.ts` for correctness validation (NOT a load test, just quick validation of result parity).
+
 ## Adding a new experiment
 
 When creating experiment `NN`, follow this checklist.
 
 1. Create `experiments/NN_short_name/` with:
    - `README.md` (hypothesis, repro, results, conclusion)
-   - `run.ts` (benchmark runner)
-   - optional: `parity.ts`, `accuracy.ts`
+   - `run.ts` (MUST use Benchmark class + k6)
+   - optional: `accuracy.ts` (separate correctness validation)
 2. Create `backend/src/routes/exp-NN.ts` and define endpoints under `/exp/NN/*`.
 3. Register route in `backend/src/server.ts` using `app.use("/exp/NN", expNNRoutes)`.
 4. Add reusable SQL builders in `backend/src/queries/*` if shared across routes.
-5. Use env-based base URL in scripts:
-   - `const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";`
-6. Write results to `benchmark-results/NN_short_name/`.
-7. Verify endpoint correctness before performance claims:
-   - parity test if comparing multiple implementations
-   - verify error paths (invalid params/table/limits)
-8. Run full integration checks with real HTTP calls against local backend.
-9. Update docs:
+5. Results automatically saved to `benchmark-results/NN_short_name/result.json` by Benchmark class.
+6. Verify endpoint correctness before performance claims:
+   - Use `accuracy.ts` to compare results between variants
+   - Verify error paths (invalid params/table/limits)
+7. Run full integration checks with real HTTP calls against local backend.
+8. Update docs:
    - add one-line summary to root `README.md` experiments table
    - keep full analysis inside `experiments/NN_short_name/README.md`
 
@@ -93,10 +129,16 @@ Each experiment README should include:
 2. Hypothesis
 3. Method/setup
 4. How to reproduce (`npx tsx ...`)
-5. Results table(s)
+5. Results table(s) with k6 metrics (throughput, p95, p99, avg latency, failure rate)
 6. Interpretation/trade-offs
 7. Conclusion (clear recommendation)
 8. Limitations/notes (if any)
+
+**Important**: Only create `README.md` files. Never create separate documentation files like `LARGE_SCALE_VALIDATION.md` or similar. Put all conclusions, findings, and validation results directly in the main README.md file.
+
+## File Creation Policy
+
+**NEVER write files other than READMEs.** All documentation, conclusions, validation results, and findings must go inside the experiment's `README.md` file. Do not create separate documentation files.
 
 ## Experiment Numbering
 
@@ -107,8 +149,10 @@ Experiments are numbered sequentially:
 - **exp-04**: Geometry simplification
 - **exp-05**: Batch algorithms (JSON expansion vs temp table)
 - **exp-06**: Spatial tile cache (negative result)
-- **exp-07**: Bounding box filter optimization (4.4% throughput gain)
-- **exp-08**: Small batch size performance gains (600%+ improvement on 10-point batches)
-- **exp-09**: Query plan analysis with EXPLAIN ANALYZE (index usage confirmation)
+- **exp-07**: Bounding box filter optimization (4.4% large-batch, 368% small-batch gains)
+- **exp-08**: SQL functions for batch queries
+- **exp-09**: JIT impact on query performance
+- **exp-10**: Minimal payload optimization
+- **exp-11**: Hierarchy lookup optimization
 
 **Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.

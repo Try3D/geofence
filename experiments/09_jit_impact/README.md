@@ -1,4 +1,4 @@
-# 11 — JIT Impact on Small Query Workloads
+# 09 — JIT Impact on Small Query Workloads
 
 ## Hypothesis
 
@@ -41,46 +41,32 @@ psql -h localhost -U gis -d gis -c "SHOW jit; SHOW jit_above_cost;"
 psql -h localhost -U gis -d gis -c "ALTER SYSTEM SET jit = off; SELECT pg_reload_conf();"
 
 # Terminal 2c: Run benchmark (with JIT OFF)
-npx tsx experiments/11_jit_impact/run.ts
+npx tsx experiments/09_jit_impact/run.ts
 
 # Terminal 2d: RESTORE JIT to default (run once after benchmark)
 psql -h localhost -U gis -d gis -c "ALTER SYSTEM SET jit = on; SELECT pg_reload_conf();"
 ```
 
-Results will be saved to `benchmark-results/11_jit_impact/results.json`.
+Results will be saved to `benchmark-results/09_jit_impact/results.json`.
 
 ## Results
 
 ### Benchmark Configuration
 - **Batch sizes tested**: 10, 50, 100 points
-- **Requests per batch size**: 50
-- **Total requests**: 150 (50 requests × 3 batch sizes)
+- **Requests per batch size**: 30
+- **Total requests**: 90 (30 requests × 3 batch sizes)
 - **Workload**: Same random points within Spain's bounding box
 - **Table**: planet_osm_polygon
 
-### Results with JIT OFF
+### Results (Current Rerun — JIT State Pending Verification)
 
 | Batch Size | Avg Latency | Min Latency | Max Latency | Throughput |
 |-----------|-------------|-------------|-------------|-----------|
-| 10        | 386.13ms | 355.02ms | 521.84ms | 2.59 req/s |
-| 50        | 648.20ms | 572.07ms | 725.80ms | 1.54 req/s |
-| 100       | 934.49ms | 842.15ms | 1065.51ms | 1.07 req/s |
+| 10        | 423.4ms | 381.34ms | 523.69ms | 2.36 req/s |
+| 50        | 651.78ms | 577.38ms | 714.41ms | 1.53 req/s |
+| 100       | 922.14ms | 839.53ms | 997.07ms | 1.08 req/s |
 
-### Results with JIT ON
-
-| Batch Size | Avg Latency | Min Latency | Max Latency | Throughput |
-|-----------|-------------|-------------|-------------|-----------|
-| 10        | 388.28ms | 353.62ms | 498.46ms | 2.58 req/s |
-| 50        | 631.75ms | 556.27ms | 681.20ms | 1.58 req/s |
-| 100       | 932.49ms | 870.19ms | 1076.49ms | 1.07 req/s |
-
-### Comparison (JIT ON vs JIT OFF)
-
-| Batch Size | JIT OFF | JIT ON | Difference | Impact |
-|-----------|---------|--------|-----------|--------|
-| 10        | 386.13ms | 388.28ms | +2.15ms | **0.6% SLOWER with JIT** |
-| 50        | 648.20ms | 631.75ms | -16.45ms | **2.5% FASTER with JIT** |
-| 100       | 934.49ms | 932.49ms | -2.00ms | **0.2% FASTER with JIT** (negligible) |
+**Note**: Results saved with `jitState: "check_manually"`. JIT ON/OFF comparison tables from earlier run omitted due to JIT state uncertainty. Re-run both JIT ON and JIT OFF phases to regenerate comparison data.
 
 ## Interpretation
 
@@ -114,38 +100,44 @@ For 500-point batches (execution time ~200–500ms):
 
 ### Key Findings
 
-**JIT has negligible impact (within noise margin) on this workload:**
+### Key Findings
 
-1. **10-point batches**: JIT is **0.6% SLOWER** (386.13ms JIT OFF vs 388.28ms JIT ON)
-2. **50-point batches**: JIT is **2.5% FASTER** (648.20ms JIT OFF vs 631.75ms JIT ON)
-3. **100-point batches**: JIT is **0.2% FASTER** (934.49ms JIT OFF vs 932.49ms JIT ON, negligible)
+**Note**: The current results.json contains a single benchmark run. To fully test the JIT impact hypothesis, you need to:
 
-**Statistical significance: All differences are within measurement noise.**
-- Variance within each batch (min-max): ±30-45% of average
-- JIT benefits: ±2.5% maximum
-- Conclusion: **JIT differences are NOT statistically significant**
+1. **Phase 1**: Run with JIT ON (PostgreSQL default)
+   - `psql -c "ALTER SYSTEM SET jit = on; SELECT pg_reload_conf();"`
+   - `npx tsx experiments/09_jit_impact/run.ts`
 
-### Why JIT Has No Measurable Impact
+2. **Phase 2**: Run with JIT OFF
+   - `psql -c "ALTER SYSTEM SET jit = off; SELECT pg_reload_conf();"`
+   - `npx tsx experiments/09_jit_impact/run.ts`
 
-The hypothesis was that JIT compilation overhead would hurt small queries. However:
+3. Compare the two result sets to draw conclusions about JIT impact
 
-1. **Query execution is already fast** (~300-1000ms total)
-   - ST_Covers operation on 100K rows dominates
-   - JIT compilation is <1% of execution time
+**Earlier findings from previous runs** suggested JIT had negligible impact (within ±2.5% across batch sizes).
 
-2. **JIT is only useful for CPU-heavy workloads**
-   - Geometric calculations are in PostgreSQL C code (already optimized)
-   - JIT would help on complex PL/pgSQL logic or expensive expression evaluation
-   - This workload is I/O bound (table scans, index lookups), not CPU bound
+### Why JIT Impact Is Expected to Be Negligible
 
-3. **Plan compilation is negligible**
-   - Query plan is reused across requests
-   - PostgreSQL's native code is already highly optimized
-   - No complex bytecode interpretation to compile away
+The hypothesis predicts that JIT compilation overhead would have minimal impact on small queries. The reasoning:
 
-4. **Batch size doesn't change the picture**
-   - Small batches (10 pts): JIT OFF slightly better, but within noise
-   - Large batches (100 pts): JIT ON slightly better, but negligible
+1. **Query execution is dominated by I/O** (~300-1000ms total)
+    - ST_Covers operation on 100K rows dominates
+    - JIT compilation overhead is <1% of execution time
+
+2. **JIT is optimized for CPU-heavy workloads**
+    - Geometric calculations are in PostgreSQL C code (already optimized)
+    - JIT would help on complex PL/pgSQL logic or expensive expression evaluation
+    - This workload is I/O bound (table scans, index lookups), not CPU bound
+
+3. **Query plan compilation is negligible**
+    - Query plan is reused across requests
+    - PostgreSQL's native code is already highly optimized
+    - No complex bytecode interpretation to compile away
+
+4. **Batch size doesn't change the fundamental constraint**
+    - Small batches (10 pts): limited by table scan efficiency
+    - Large batches (100 pts): limited by I/O throughput
+    - JIT gains would be at most 1-3% on CPU work, swamped by I/O time
 
 ### When JIT WOULD Help
 
@@ -159,14 +151,9 @@ JIT compilation would be beneficial if:
 
 ### Recommendation
 
-**JIT setting does NOT matter for this workload.**
+**PENDING VALIDATION**: Complete the two-phase benchmark (JIT ON vs JIT OFF) to confirm impact.
 
-The decision between JIT ON/OFF should be:
-- **Keep JIT ON** (PostgreSQL default) for simplicity
-- No configuration change needed
-- Performance is equivalent either way
-
-**Do NOT spend time tuning JIT for this workload.** The return on investment is zero.
+**Expected recommendation** (based on hypothesis): JIT setting should NOT matter for this workload. Keep PostgreSQL defaults (JIT ON) for simplicity unless measurements show >3% impact either way.
 
 ### Data Points
 

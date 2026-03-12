@@ -1,4 +1,4 @@
-# 10 — SQL Function & Prepared Statement Optimization
+# 08 — SQL Function & Prepared Statement Optimization
 
 ## Hypothesis
 
@@ -31,7 +31,7 @@ Before running the benchmark, manually create the SQL function in your database:
 psql -h localhost -U gis -d gis
 
 # Run the setup commands from setup.sql
-\i experiments/10_sql_functions/setup.sql
+\i experiments/08_sql_functions/setup.sql
 
 # Verify the function was created
 \df batch_lookup_lateral
@@ -44,10 +44,10 @@ psql -h localhost -U gis -d gis
 npm run dev
 
 # Terminal 2: Run benchmark (50 requests per variant)
-npx tsx experiments/10_sql_functions/run.ts
+npx tsx experiments/08_sql_functions/run.ts
 ```
 
-Results will be saved to `benchmark-results/10_sql_functions/results.json`.
+Results will be saved to `benchmark-results/08_sql_functions/results.json`.
 
 ## Results
 

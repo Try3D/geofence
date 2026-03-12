@@ -51,7 +51,7 @@ async function fetchResults(
 
 async function getJitStatus(): Promise<string> {
   try {
-    const response = await fetch(`${BASE_URL}/exp/11/status`);
+    const response = await fetch(`${BASE_URL}/exp/09/status`);
     const data = await response.json();
     return "unknown";
   } catch {
@@ -67,12 +67,12 @@ async function runBenchmark(): Promise<void> {
   );
   console.log("PHASE 1: Benchmark with JIT ON (default)");
   console.log("  1. Ensure JIT is enabled: psql -c \"ALTER SYSTEM SET jit = on; SELECT pg_reload_conf();\"");
-  console.log("  2. Run: npx tsx experiments/11_jit_impact/run.ts");
+  console.log("  2. Run: npx tsx experiments/09_jit_impact/run.ts");
   console.log(
     "\nPHASE 2: Benchmark with JIT OFF"
   );
   console.log("  1. Disable JIT: psql -c \"ALTER SYSTEM SET jit = off; SELECT pg_reload_conf();\"");
-  console.log("  2. Run: npx tsx experiments/11_jit_impact/run.ts");
+  console.log("  2. Run: npx tsx experiments/09_jit_impact/run.ts");
   console.log(
     "\nPHASE 3: Restore"
   );
@@ -85,7 +85,7 @@ async function runBenchmark(): Promise<void> {
   console.log(`Config: ${REQUESTS_PER_SIZE} requests per batch size\n`);
 
   const results: BenchmarkResult[] = [];
-  const endpoint = "/exp/11/lookup";
+  const endpoint = "/exp/09/lookup";
 
   for (const batchSize of BATCH_SIZES) {
     console.log(`\nBatch Size: ${batchSize} points`);
@@ -147,7 +147,7 @@ async function runBenchmark(): Promise<void> {
 
   // Save results to file
   const fs = await import("fs");
-  const resultsDir = "/Users/rsaran/Projects/geofence/benchmark-results/11_jit_impact";
+  const resultsDir = "/Users/rsaran/Projects/geofence/benchmark-results/09_jit_impact";
   if (!fs.existsSync(resultsDir)) {
     fs.mkdirSync(resultsDir, { recursive: true });
   }

@@ -1,4 +1,4 @@
-# 12 — Minimal Payload Optimization (IDs Only)
+# 10 — Minimal Payload Optimization (IDs Only)
 
 ## Hypothesis
 
@@ -55,11 +55,11 @@ Approx size: ~50 bytes per match + headers (75% reduction)
 # Terminal 1: Start backend
 npm run dev
 
-# Terminal 2: Run benchmark (50 requests per variant)
-npx tsx experiments/12_minimal_payload/run.ts
+# Terminal 2: Run benchmark (10 requests per variant)
+npx tsx experiments/10_minimal_payload/run.ts
 ```
 
-Results will be saved to `benchmark-results/12_minimal_payload/results.json`.
+Results will be saved to `benchmark-results/10_minimal_payload/results.json`.
 
 ## Results
 

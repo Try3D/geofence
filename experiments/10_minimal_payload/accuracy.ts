@@ -19,7 +19,11 @@ async function testVariant(
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ points }),
+    body: JSON.stringify({
+      points,
+      table: "planet_osm_polygon",
+      limit: 20,
+    }),
   });
 
   if (!response.ok) {
@@ -40,10 +44,10 @@ function areResultsEqual(
     const r2 = results2[i];
 
     if (r1.idx !== r2.idx) return false;
-    if (r1.matches.length !== r2.matches.length) return false;
+    if ((r1.results || r1).length !== (r2.results || r2).length) return false;
 
-    const set1 = new Set(r1.matches.map((m: any) => m.osm_id));
-    const set2 = new Set(r2.matches.map((m: any) => m.osm_id));
+    const set1 = new Set((r1.results || r1).map((m: any) => m.osm_id));
+    const set2 = new Set((r2.results || r2).map((m: any) => m.osm_id));
 
     if (set1.size !== set2.size) return false;
     for (const id of set1) {
@@ -57,7 +61,7 @@ function areResultsEqual(
 async function main() {
   console.log(
     "=" + "=".repeat(79) +
-      "\n  Accuracy Validation: Small Batch Size Performance Gains (exp-08)\n" +
+      "\n  Accuracy Validation: Minimal Payload Optimization (exp-12)\n" +
       "=" + "=".repeat(79)
   );
 
@@ -68,41 +72,41 @@ async function main() {
     const points = generateRandomPoints(batchSize);
 
     try {
-      process.stdout.write("  → Fetching results from batch-no-bbox... ");
-      const noBbox = await testVariant("/exp/07/batch-no-bbox", points);
-      console.log(`✓ Got ${noBbox.results.length} results`);
+      process.stdout.write("  → Fetching results from full... ");
+      const full = await testVariant("/exp/12/full", points);
+      console.log(`✓ Got ${(full.results || full).length} results`);
 
-      process.stdout.write("  → Fetching results from batch-with-bbox... ");
-      const withBbox = await testVariant("/exp/07/batch-with-bbox", points);
-      console.log(`✓ Got ${withBbox.results.length} results`);
+      process.stdout.write("  → Fetching results from ids-only... ");
+      const idsOnly = await testVariant("/exp/12/ids-only", points);
+      console.log(`✓ Got ${(idsOnly.results || idsOnly).length} results`);
 
-      process.stdout.write("  → Fetching results from batch-with-bbox-indexed... ");
-      const indexed = await testVariant("/exp/07/batch-with-bbox-indexed", points);
-      console.log(`✓ Got ${indexed.results.length} results`);
+      process.stdout.write("  → Fetching results from ids-optimized... ");
+      const idsOptimized = await testVariant("/exp/12/ids-optimized", points);
+      console.log(`✓ Got ${(idsOptimized.results || idsOptimized).length} results`);
 
       console.log("\nComparing results...\n");
 
-      const noBboxVsWithBbox = areResultsEqual(noBbox.results, withBbox.results);
-      const noBboxVsIndexed = areResultsEqual(noBbox.results, indexed.results);
-      const withBboxVsIndexed = areResultsEqual(withBbox.results, indexed.results);
+      const fullVsIds = areResultsEqual(full.results || full, idsOnly.results || idsOnly);
+      const fullVsOptimized = areResultsEqual(full.results || full, idsOptimized.results || idsOptimized);
+      const idsVsOptimized = areResultsEqual(idsOnly.results || idsOnly, idsOptimized.results || idsOptimized);
 
       console.log(
-        `  batch-no-bbox vs batch-with-bbox:         ${
-          noBboxVsWithBbox ? "✅ MATCH" : "❌ MISMATCH"
+        `  full vs ids-only:         ${
+          fullVsIds ? "✅ MATCH" : "❌ MISMATCH"
         }`
       );
       console.log(
-        `  batch-no-bbox vs batch-with-bbox-indexed: ${
-          noBboxVsIndexed ? "✅ MATCH" : "❌ MISMATCH"
+        `  full vs ids-optimized:    ${
+          fullVsOptimized ? "✅ MATCH" : "❌ MISMATCH"
         }`
       );
       console.log(
-        `  batch-with-bbox vs batch-with-bbox-indexed: ${
-          withBboxVsIndexed ? "✅ MATCH" : "❌ MISMATCH"
+        `  ids-only vs ids-optimized: ${
+          idsVsOptimized ? "✅ MATCH" : "❌ MISMATCH"
         }`
       );
 
-      if (!noBboxVsWithBbox || !noBboxVsIndexed || !withBboxVsIndexed) {
+      if (!fullVsIds || !fullVsOptimized || !idsVsOptimized) {
         console.log("\n❌ FAILURE: Results do not match!");
         process.exit(1);
       }
@@ -115,7 +119,7 @@ async function main() {
   console.log(
     "\n✅ SUCCESS: All batch sizes return identical results across all variants!\n"
   );
-  console.log("Conclusion: Bbox filters do NOT introduce false positives or false negatives.\n");
+  console.log("Conclusion: Payload optimizations do NOT introduce false positives or false negatives.\n");
 }
 
 main().catch(console.error);
