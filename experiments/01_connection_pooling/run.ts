@@ -11,6 +11,7 @@ import { Benchmark, GEOFENCE_PRESETS } from "@geofence/profiler";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "../..");
+const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
   name: "Connection Pool Size Optimization",
@@ -26,7 +27,7 @@ const bench = new Benchmark({
       pgPool: 20,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -36,7 +37,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -46,7 +47,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -56,7 +57,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -66,7 +67,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -76,7 +77,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },
@@ -86,7 +87,7 @@ const bench = new Benchmark({
       pgPool: 25,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/01/batch`,
         BODY: JSON.stringify({ points: [], limit: 20 }),
       },
     },

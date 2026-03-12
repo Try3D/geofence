@@ -8,6 +8,8 @@
 
 import { randomPoints } from "@geofence/profiler";
 
+const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
+
 interface BatchResult {
   idx: number;
   matches: Array<{ osm_id: string; name: string }>;
@@ -81,25 +83,25 @@ async function testBatch(
 
   console.log(`\n  Testing batch size ${batchSize}, table ${table}...`);
 
-  try {
-    // Call all three endpoints
-    const [jsonRes, tempRes, serialRes] = await Promise.all([
-      fetch("http://localhost:3000/api/polygons/batch-json", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-      fetch("http://localhost:3000/api/polygons/batch-temp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-      fetch("http://localhost:3000/api/polygons/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      }),
-    ]);
+   try {
+     // Call all three endpoints
+     const [jsonRes, tempRes, serialRes] = await Promise.all([
+       fetch(`${BASE_URL}/exp/05/batch-json`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify(payload),
+       }),
+       fetch(`${BASE_URL}/exp/05/batch-temp`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify(payload),
+       }),
+       fetch(`${BASE_URL}/exp/05/batch`, {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify(payload),
+       }),
+     ]);
 
     if (!jsonRes.ok || !tempRes.ok || !serialRes.ok) {
       console.error(

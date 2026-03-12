@@ -16,6 +16,7 @@ import { Benchmark, randomPoints, GEOFENCE_PRESETS } from "@geofence/profiler";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "../..");
+const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
   name: "Geometry Simplification Benchmark",
@@ -31,7 +32,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -41,7 +42,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -53,7 +54,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_10" }),
       },
     },
@@ -63,7 +64,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_10" }),
       },
     },
@@ -75,7 +76,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_100" }),
       },
     },
@@ -85,7 +86,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_100" }),
       },
     },
@@ -97,7 +98,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_500" }),
       },
     },
@@ -107,7 +108,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_500" }),
       },
     },
@@ -119,7 +120,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_1000" }),
       },
     },
@@ -129,7 +130,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: "${BASE_URL}/exp/04/batch",
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20, table: "planet_osm_polygon_simple_1000" }),
       },
     },

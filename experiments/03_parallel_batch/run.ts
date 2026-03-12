@@ -15,6 +15,7 @@ import { Benchmark, randomPoints, GEOFENCE_PRESETS } from "@geofence/profiler";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.join(__dirname, "../..");
+const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
   name: "Batch Strategy Comparison (serial vs parallel vs set-join)",
@@ -34,7 +35,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/03/batch`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -44,7 +45,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch",
+        TARGET_URL: `${BASE_URL}/exp/03/batch`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -56,7 +57,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-parallel",
+        TARGET_URL: `${BASE_URL}/exp/03/batch-parallel`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -66,7 +67,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-parallel",
+        TARGET_URL: `${BASE_URL}/exp/03/batch-parallel`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -78,7 +79,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-set",
+        TARGET_URL: `${BASE_URL}/exp/03/batch-set`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
@@ -88,7 +89,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: "http://localhost:3000/api/polygons/batch-set",
+        TARGET_URL: `${BASE_URL}/exp/03/batch-set`,
         BODY: JSON.stringify({ points: randomPoints(1000), limit: 20 }),
       },
     },
