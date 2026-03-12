@@ -32,8 +32,6 @@ Five test scenarios were executed to validate that all three endpoints return id
 
 ## Implementation Details
 
-### Implementation Details
-
 #### 1. JSON Expansion (`POST /exp/05/batch-json`) — RECOMMENDED
 
 **Strategy:** `unnest()` points and perform set-based spatial join with aggregation.
