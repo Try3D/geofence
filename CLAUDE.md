@@ -68,3 +68,15 @@ Each experiment README should include:
 6. Interpretation/trade-offs
 7. Conclusion (clear recommendation)
 8. Limitations/notes (if any)
+
+## Experiment Numbering
+
+Experiments are numbered sequentially:
+- **exp-01**: Connection pooling
+- **exp-02**: Batch vs single queries
+- **exp-03**: Parallel batch processing
+- **exp-04**: Geometry simplification
+- **exp-05**: Batch algorithms (JSON expansion vs temp table)
+- **exp-06**: Spatial tile cache (negative result)
+
+**Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.
