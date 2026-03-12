@@ -78,5 +78,6 @@ Experiments are numbered sequentially:
 - **exp-04**: Geometry simplification
 - **exp-05**: Batch algorithms (JSON expansion vs temp table)
 - **exp-06**: Spatial tile cache (negative result)
+- **exp-07**: Bounding box filter optimization (4.4% throughput gain)
 
 **Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.
