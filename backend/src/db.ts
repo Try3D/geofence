@@ -6,5 +6,5 @@ export const pool = new Pool({
   user: process.env.PGUSER || "gis",
   password: process.env.PGPASSWORD || "gis",
   database: process.env.PGDATABASE || "gis",
-  max: 15,
+  max: 40,
 });

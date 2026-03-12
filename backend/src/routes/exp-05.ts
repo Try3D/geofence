@@ -27,14 +27,24 @@ router.post(
       validateBatchPayload(points);
       const { lons, lats } = parseCoordinates(points);
       const table = parseTable(tableRaw);
-      const limit = parsePositiveInt(limitRaw, 20);
+      parsePositiveInt(limitRaw, 20); // Parse but don't use (for consistency with JSON/temp)
 
       const query = getLateralBatchQuery(table);
-      const result = await pool.query<BatchResult>(query, [lons, lats, limit]);
+      const result = await pool.query<BatchResult>(query, [lons, lats]);
+
+      // Normalize response: group flat results into {idx, matches} format
+      const grouped: Record<number, any> = {};
+      for (let i = 0; i < points.length; i++) {
+        grouped[i] = { idx: i, matches: [] };
+      }
+
+      result.rows.forEach((row) => {
+        grouped[row.idx].matches.push({ osm_id: row.osm_id, name: row.name });
+      });
 
       res.json({
         count: points.length,
-        results: result.rows,
+        results: Object.values(grouped),
       });
     } catch (error) {
       const message = formatError(error);
@@ -129,9 +139,12 @@ router.post(
       // Perform set-based spatial join with aggregation
       const joinQuery = `
         SELECT bp.idx::int,
-               array_agg(
-                 json_build_object('osm_id', p.osm_id::text, 'name', COALESCE(p.name, p.tags->'name'))
-                 ORDER BY p.osm_id
+               COALESCE(
+                 array_agg(
+                   json_build_object('osm_id', p.osm_id::text, 'name', COALESCE(p.name, p.tags->'name'))
+                   ORDER BY p.osm_id
+                 ) FILTER (WHERE p.osm_id IS NOT NULL),
+                 '{}'::json[]
                ) AS matches
         FROM batch_points bp
         LEFT JOIN ${table} p ON ST_Covers(p.way, bp.geom)

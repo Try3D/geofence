@@ -17,7 +17,6 @@ export function getLateralBatchQuery(table: string): string {
              COALESCE(p.name, p.tags->'name') AS name
       FROM ${table} p
       WHERE ST_Covers(p.way, pts.g)
-      LIMIT $3
     ) match
   `;
 }

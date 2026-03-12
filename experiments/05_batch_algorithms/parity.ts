@@ -79,7 +79,7 @@ async function testBatch(
   table: string = "planet_osm_polygon"
 ): Promise<boolean> {
   const points = randomPoints(batchSize);
-  const payload = { points, table, limit: 1000 }; // Use high limit for parity testing
+  const payload = { points, table, limit: 100000 }; // Use very high limit to ensure all matches are returned
 
   console.log(`\n  Testing batch size ${batchSize}, table ${table}...`);
 
@@ -117,20 +117,12 @@ async function testBatch(
     // All endpoints return { count, results: [...] }
     const jsonData = (jsonDataRaw.results || []) as BatchResult[];
     const tempData = (tempDataRaw.results || []) as BatchResult[];
-    const serialResults = serialDataRaw.results;
-    
-    if (!Array.isArray(serialResults)) {
-      console.error(`  ✗ serial results is not an array: ${typeof serialResults}, value: ${JSON.stringify(serialResults)}`);
-      return false;
-    }
-
-    // For serial endpoint, convert flat output to grouped format
-    const serialGrouped = groupSerialResults(serialResults as any[], batchSize);
+    const serialData = (serialDataRaw.results || []) as BatchResult[];
 
     // Normalize all results
     const jsonNorm = normalizeResults(jsonData);
     const tempNorm = normalizeResults(tempData);
-    const serialNorm = normalizeResults(serialGrouped);
+    const serialNorm = normalizeResults(serialData);
 
     // Compare
     let allMatch = true;
@@ -158,30 +150,6 @@ async function testBatch(
     console.error(`  ✗ Error: ${err}`);
     return false;
   }
-}
-
-/**
- * Convert flat serial results [{idx, osm_id, name}, ...] to grouped [{idx, matches: [...]}, ...]
- */
-function groupSerialResults(flatResults: any[], batchSize: number): BatchResult[] {
-  if (!Array.isArray(flatResults)) {
-    console.error(`  ✗ groupSerialResults: flatResults is ${typeof flatResults}, not array`);
-    throw new Error(`flatResults must be an array, got ${typeof flatResults}`);
-  }
-  
-  const grouped: Record<number, BatchResult> = {};
-
-  for (let i = 0; i < batchSize; i++) {
-    grouped[i] = { idx: i, matches: [] };
-  }
-
-  flatResults.forEach((item) => {
-    if (grouped[item.idx]) {
-      grouped[item.idx].matches.push({ osm_id: item.osm_id, name: item.name });
-    }
-  });
-
-  return Object.values(grouped);
 }
 
 /**
