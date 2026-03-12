@@ -15,7 +15,7 @@ Prerequisites:
 
 ```bash
 # From project root
-node experiments/01_connection_pooling/run.js
+npx tsx experiments/01_connection_pooling/run.ts
 ```
 
 The script cycles through 7 pool-size combinations, restarting the backend and

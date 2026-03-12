@@ -17,7 +17,7 @@ const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
   name: "Batch Size 1000 Comparison (JSON vs Temp vs Serial LATERAL)",
-  resultsDir: path.join(ROOT, "benchmark-results", "06_batch_algorithms_1000"),
+  resultsDir: path.join(ROOT, "benchmark-results", "05_batch_algorithms_1000"),
 
   mutators: GEOFENCE_PRESETS.mutators,
   services: {

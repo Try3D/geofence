@@ -17,7 +17,7 @@ Prerequisites:
 
 ```bash
 # From project root
-node experiments/03_parallel_batch/run.js
+npx tsx experiments/03_parallel_batch/run.ts
 ```
 
 Results land in `benchmark-results/batch-strategies/`.

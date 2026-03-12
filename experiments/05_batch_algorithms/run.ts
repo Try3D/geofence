@@ -25,7 +25,7 @@ const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
   name: "Batch Algorithm Comparison (JSON expansion vs Temp table vs Serial LATERAL)",
-  resultsDir: path.join(ROOT, "benchmark-results", "06_batch_algorithms"),
+  resultsDir: path.join(ROOT, "benchmark-results", "05_batch_algorithms"),
 
   mutators: GEOFENCE_PRESETS.mutators,
   services: {
@@ -103,7 +103,7 @@ const bench = new Benchmark({
       batchSize: 100,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(100) }),
       },
     },
@@ -113,7 +113,7 @@ const bench = new Benchmark({
       batchSize: 100,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(100) }),
       },
     },
@@ -123,7 +123,7 @@ const bench = new Benchmark({
       batchSize: 100,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(100) }),
       },
     },
@@ -197,7 +197,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },
@@ -207,7 +207,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },
@@ -217,7 +217,7 @@ const bench = new Benchmark({
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/05/batch,
+        TARGET_URL: `${BASE_URL}/exp/05/batch`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },

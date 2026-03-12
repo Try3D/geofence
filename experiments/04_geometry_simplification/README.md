@@ -17,7 +17,7 @@ Prerequisites:
 ### Accuracy analysis (direct DB, no k6)
 
 ```bash
-node experiments/04_geometry_simplification/accuracy.js
+npx tsx experiments/04_geometry_simplification/accuracy.ts
 ```
 
 Generates 2 000 random test points, queries each simplification level, and
@@ -26,7 +26,7 @@ prints an IoU accuracy table.
 ### Throughput benchmark (k6)
 
 ```bash
-node experiments/04_geometry_simplification/run.js
+npx tsx experiments/04_geometry_simplification/run.ts
 ```
 
 Results land in `benchmark-results/simplification/`.

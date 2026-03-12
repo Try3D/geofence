@@ -15,7 +15,7 @@ Prerequisites:
 
 ```bash
 # From project root
-node experiments/02_batch_vs_single/run.js
+npx tsx experiments/02_batch_vs_single/run.ts
 ```
 
 Results land in `benchmark-results/comparison/`.
