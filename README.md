@@ -14,11 +14,11 @@ experiments that drove the production configuration.
 | [02](experiments/02_batch_vs_single/) | Batch vs Single | Single-point parallelises better (902 pts/s vs 645) |
 | [03](experiments/03_parallel_batch/) | Parallel Batch | Promise.all chunking: 2.48× over serial at vus=5 |
 | [04](experiments/04_geometry_simplification/) | Geometry Simplification | simple_10 (10 m): 2.48× speedup, IoU=0.9993 |
-| [06](experiments/06_batch_algorithms/) | Batch Algorithm Comparison | **JSON expansion is 3.8% faster than temp table; 26.4% faster than serial LATERAL** |
+| [05](experiments/05_batch_algorithms/) | Batch Algorithm Comparison | **JSON expansion is 3.8% faster than temp table; 26.4% faster than serial LATERAL** |
 
 Each experiment folder contains:
 - `README.md` — hypothesis, exact reproduction steps, results table, conclusion
-- `run.js` — runnable benchmark (some also have `accuracy.js`)
+- `run.ts` — runnable benchmark (some also have `parity.ts`)
 
 ---
 
@@ -30,6 +30,13 @@ geofence/
 ├── tools/                ← ops/utility scripts (OSM import, DB inspection)
 ├── profiler/             ← @geofence/profiler library used by experiment scripts
 ├── backend/              ← Express API (PostGIS point-in-polygon)
+│   └── src/
+│       ├── server.ts     ← App setup + route registration
+│       ├── db.ts         ← Connection pool
+│       ├── types/        ← Shared type definitions
+│       ├── utils/        ← Validators, error handling
+│       ├── queries/      ← Reusable SQL query builders
+│       └── routes/       ← Experiment-scoped endpoints (exp-01 through exp-05)
 ├── db/                   ← sqlx migrations
 ├── docker/               ← Dockerfiles
 ├── docker-compose.yml
@@ -55,7 +62,47 @@ sqlx migrate run --source db/migrations \
 cd backend && npm install && npm run dev
 
 # 5. Run an experiment
-node experiments/02_batch_vs_single/run.js
+npx tsx experiments/02_batch_vs_single/run.ts
+```
+
+---
+
+## Backend Architecture
+
+The backend is organized into experiment-scoped routes for clarity and maintainability:
+
+### Route Structure
+
+```
+GET  /health                    # System health check
+POST /exp/01/batch              # Connection pooling experiment
+GET  /exp/02/contains           # Single-point lookups
+POST /exp/02/batch              # Batch lookups
+POST /exp/03/batch              # Serial LATERAL (baseline)
+POST /exp/03/batch-parallel     # Chunked parallelization
+POST /exp/03/batch-set          # Set-join approach
+POST /exp/04/batch              # Geometry simplification (supports `table` param)
+POST /exp/05/batch              # Serial LATERAL (reference)
+POST /exp/05/batch-json         # JSON expansion (recommended)
+POST /exp/05/batch-temp         # Temp table approach
+```
+
+### Shared Utilities
+
+- **types/** — Centralized TypeScript types (ContainsItem, BatchResult, etc.)
+- **utils/** — Validation logic, error handling, async wrappers
+- **queries/** — Reusable SQL query builders (no duplication across routes)
+
+### Environment Configuration
+
+```bash
+API_BASE_URL=http://localhost:3000  # Used by experiment scripts (default)
+PORT=3000                           # API server port (default)
+PGHOST=localhost
+PGPORT=5433
+PGUSER=gis
+PGPASSWORD=gis
+PGDATABASE=gis
 ```
 
 ---
@@ -69,7 +116,7 @@ node experiments/02_batch_vs_single/run.js
 
 ---
 
-## Batch Algorithm Analysis (Experiment 06)
+## Batch Algorithm Analysis (Experiment 05)
 
 ### Executive Summary
 
@@ -87,10 +134,11 @@ Uses a single SQL query with `unnest()` to expand arrays and `ST_Covers()` for s
 ```sql
 SELECT idx, array_agg(json_build_object(...)) AS matches
 FROM unnest($1::float8[], $2::float8[]) WITH ORDINALITY AS t(idx, lon, lat)
-JOIN planet_osm_polygon p ON ST_Covers(p.way, ST_Transform(...))
+LEFT JOIN planet_osm_polygon p ON ST_Covers(p.way, ST_Transform(...))
 GROUP BY idx
 ORDER BY idx
 ```
+**Endpoint:** `POST /exp/05/batch-json`
 - **Execution Model:** Single table scan + parallel spatial index lookups
 - **Memory:** All points and results in single result set
 - **Connection Pool:** 1 connection per request
@@ -103,9 +151,10 @@ BEGIN TRANSACTION
 CREATE TEMP TABLE batch_points(idx INT, geom GEOMETRY)
 INSERT INTO batch_points VALUES (...)
 CREATE INDEX idx_batch_points_geom ON batch_points USING GIST(geom)
-SELECT ... FROM batch_points JOIN planet_osm_polygon ON ST_Covers(...)
+SELECT ... FROM batch_points LEFT JOIN planet_osm_polygon ON ST_Covers(...)
 COMMIT
 ```
+**Endpoint:** `POST /exp/05/batch-temp`
 - **Execution Model:** Set-based but with temp table creation overhead
 - **Memory:** Temp table structure + indexes + result set
 - **Connection Pool:** 1 connection per request
@@ -114,10 +163,10 @@ COMMIT
 #### 3. Serial LATERAL (SLOWER, -26.4% throughput)
 Uses row-by-row processing with LATERAL subqueries:
 ```sql
-SELECT idx, json_agg(...) FROM points,
-LATERAL (SELECT ... FROM planet_osm_polygon WHERE ST_Covers(way, geom))
-GROUP BY idx
+SELECT idx, osm_id, name FROM points,
+LATERAL (SELECT osm_id, name FROM planet_osm_polygon WHERE ST_Covers(way, geom) LIMIT 20)
 ```
+**Endpoint:** `POST /exp/05/batch`
 - **Execution Model:** Row-based, not set-based
 - **Memory:** Per-row processing, accumulation in aggregate
 - **Connection Pool:** 1 connection per request, but sub-optimal execution
@@ -228,7 +277,7 @@ JSON expansion's superior consistency at lower concurrency (VU=5, VU=10) proves 
 
 ### Correctness Verification
 
-All three implementations were verified for correctness using the parity test suite (`experiments/06_batch_algorithms/parity.ts`), which confirmed:
+All three implementations were verified for correctness using the parity test suite (`experiments/05_batch_algorithms/parity.ts`), which confirmed:
 - ✓ All return identical result sets
 - ✓ Results are correctly indexed and ordered
 - ✓ Empty result arrays for points with no matches
@@ -237,7 +286,7 @@ All three implementations were verified for correctness using the parity test su
 ### Recommendations
 
 1. **Deploy JSON expansion as the primary batch API endpoint**
-   - Use `/api/polygons/batch-json` in production
+   - Use `POST /exp/05/batch-json` in production
    - Handles up to 1000 points per request
    - Achieves 627 points/sec sustained throughput
 
