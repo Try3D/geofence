@@ -10,6 +10,7 @@ import exp02Routes from "./routes/exp-02";
 import exp03Routes from "./routes/exp-03";
 import exp04Routes from "./routes/exp-04";
 import exp05Routes from "./routes/exp-05";
+import exp07Routes from "./routes/exp-07";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -22,6 +23,7 @@ app.use("/exp/02", exp02Routes);
 app.use("/exp/03", exp03Routes);
 app.use("/exp/04", exp04Routes);
 app.use("/exp/05", exp05Routes);
+app.use("/exp/07", exp07Routes);
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
