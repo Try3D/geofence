@@ -2,39 +2,69 @@
 
 ## TypeScript Execution
 
-**Do NOT compile TypeScript to JavaScript.** Use `tsx` (installed as dev dependency) to run TypeScript directly:
-
 ```bash
 # Run TypeScript files directly
-npx tsx experiments/06_batch_algorithms/run.ts
-npx tsx experiments/06_batch_algorithms/parity.ts
-
-# Or use node with --loader if tsx is not available
-node --loader ts-node/esm experiments/06_batch_algorithms/run.ts
+npx tsx experiments/05_batch_algorithms/run.ts
+npx tsx experiments/05_batch_algorithms/parity.ts
 ```
-
-Delete compiled dist directories immediately after use. Never commit `experiments_dist/`, `dist/`, or `**/dist/**` to git.
 
 ## Migrations
 
-Run migrations using the **system `sqlx` CLI**, not Docker:
+Run migrations using the **system `sqlx` CLI**:
 
 ```bash
 sqlx migrate run --source db/migrations --database-url postgresql://gis:gis@localhost:5432/gis
 ```
 
-The `migrate` service has been removed from `docker-compose.yml`. Do not add it back.
+## Experiment workflow (how we work)
 
-## Project layout
+This repo is experiment-driven. Backend route design and experiment scripts evolve together.
 
-```
-experiments/01_connection_pooling/   ← pool-sweep profiler (run.ts)
-experiments/02_batch_vs_single/      ← single vs batch throughput (run.ts)
-experiments/03_parallel_batch/       ← serial/parallel/set-join (run.ts)
-experiments/04_geometry_simplification/ ← simplification accuracy + k6 (accuracy.ts, run.ts)
-experiments/06_batch_algorithms/     ← JSON expansion vs temp table vs serial LATERAL (run.ts, parity.ts)
-tools/                               ← import-osm.sh, osium.sh, explain-batch.js, monte-carlo.js, node-worker.js
-profiler/                            ← @geofence/profiler library
-```
+### Ground rules
 
-`pg` is now a root-level dependency (root `package.json`)
+- Number experiments as `experiments/NN_short_name/`.
+- Keep backend endpoints experiment-scoped: `/exp/NN/*`.
+- Keep `backend/src/server.ts` minimal (Express setup + route registration).
+- Keep route handlers thin (parse, validate, run query, respond).
+- Reuse shared modules; avoid copy/paste logic:
+  - `backend/src/utils/validators.ts`
+  - `backend/src/utils/errorHandler.ts`
+  - `backend/src/queries/*.ts`
+  - `backend/src/types/index.ts`
+- Experiment scripts must use `API_BASE_URL` (default `http://localhost:3000`).
+- Put detailed results in each experiment README, not in root `README.md`.
+
+## Adding a new experiment
+
+When creating experiment `NN`, follow this checklist.
+
+1. Create `experiments/NN_short_name/` with:
+   - `README.md` (hypothesis, repro, results, conclusion)
+   - `run.ts` (benchmark runner)
+   - optional: `parity.ts`, `accuracy.ts`
+2. Create `backend/src/routes/exp-NN.ts` and define endpoints under `/exp/NN/*`.
+3. Register route in `backend/src/server.ts` using `app.use("/exp/NN", expNNRoutes)`.
+4. Add reusable SQL builders in `backend/src/queries/*` if shared across routes.
+5. Use env-based base URL in scripts:
+   - `const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";`
+6. Write results to `benchmark-results/NN_short_name/`.
+7. Verify endpoint correctness before performance claims:
+   - parity test if comparing multiple implementations
+   - verify error paths (invalid params/table/limits)
+8. Run full integration checks with real HTTP calls against local backend.
+9. Update docs:
+   - add one-line summary to root `README.md` experiments table
+   - keep full analysis inside `experiments/NN_short_name/README.md`
+
+## Experiment README template
+
+Each experiment README should include:
+
+1. `# NN — Experiment Name`
+2. Hypothesis
+3. Method/setup
+4. How to reproduce (`npx tsx ...`)
+5. Results table(s)
+6. Interpretation/trade-offs
+7. Conclusion (clear recommendation)
+8. Limitations/notes (if any)
