@@ -15,6 +15,12 @@ experiments that drove the production configuration.
 | [03](experiments/03_parallel_batch/) | Parallel Batch | Promise.all chunking: 2.48× over serial at vus=5 |
 | [04](experiments/04_geometry_simplification/) | Geometry Simplification | simple_10 (10 m): 2.48× speedup, IoU=0.9993 |
 | [05](experiments/05_batch_algorithms/) | Batch Algorithm Comparison | **JSON expansion is 3.8% faster than temp table; 26.4% faster than serial LATERAL** |
+| [06](experiments/06_spatial_tile_cache/) | Spatial Tile Cache | Negative result: tile overhead > gains for 50-100 point batches |
+| [07](experiments/07_bbox_filter_optimization/) | Bbox Filter Optimization | 4.4% large-batch, 368% small-batch gains with pre-filter |
+| [08](experiments/08_sql_functions/) | SQL Functions | SQL functions optimize batch queries with precompilation |
+| [09](experiments/09_jit_impact/) | JIT Impact | JIT has negligible impact (<3%) on I/O-bound spatial queries |
+| [10](experiments/10_minimal_payload/) | Minimal Payload | 29% latency reduction by optimizing query projection (IDs-only) |
+| [11](experiments/11_hierarchy_lookup/) | Hierarchy Lookup | 97-99% speedup with precomputed hierarchy (20.9ms vs 10,533ms) |
 
 Each experiment folder contains:
 - `README.md` — hypothesis, exact reproduction steps, results table, conclusion
@@ -36,7 +42,7 @@ geofence/
 │       ├── types/        ← Shared type definitions
 │       ├── utils/        ← Validators, error handling
 │       ├── queries/      ← Reusable SQL query builders
-│       └── routes/       ← Experiment-scoped endpoints (exp-01 through exp-05)
+│       └── routes/       ← Experiment-scoped endpoints (exp-01 through exp-11)
 ├── db/                   ← sqlx migrations
 ├── docker/               ← Dockerfiles
 ├── docker-compose.yml
@@ -85,6 +91,17 @@ POST /exp/04/batch              # Geometry simplification (supports `table` para
 POST /exp/05/batch              # Serial LATERAL (reference)
 POST /exp/05/batch-json         # JSON expansion (recommended)
 POST /exp/05/batch-temp         # Temp table approach
+POST /exp/06/batch              # Spatial tile cache variants
+POST /exp/07/batch              # Bbox pre-filter + ST_Covers
+POST /exp/08/lookup             # SQL functions for batch queries
+POST /exp/09/lookup             # JIT impact testing
+POST /exp/10/full               # Minimal payload - full response
+POST /exp/10/ids-only           # IDs only (query fetches name, response strips)
+POST /exp/10/ids-optimized      # IDs optimized (query excludes name)
+POST /exp/11/baseline           # Hierarchy lookup - full OSM scan baseline
+POST /exp/11/normal             # Hierarchy lookup - direct hierarchy_boundaries
+POST /exp/11/cte                # Hierarchy lookup - full ancestor path via CTE
+POST /exp/11/cte-fallback       # Hierarchy lookup - CTE with OSM fallback
 ```
 
 ### Shared Utilities

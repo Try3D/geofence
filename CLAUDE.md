@@ -18,15 +18,15 @@
 
 ```bash
 # ❌ WRONG: Uses default 120s timeout, kills benchmark mid-run
-npx tsx experiments/10_sql_functions/run.ts
+npx tsx experiments/08_sql_functions/run.ts
 
 # ✅ CORRECT: Explicit long timeout
 # timeout: 600000
-npx tsx experiments/10_sql_functions/run.ts
+npx tsx experiments/08_sql_functions/run.ts
 
 # ✅ ALSO CORRECT: No timeout parameter = runs until done
 # (Do this for benchmark scripts that take 5-10 minutes)
-npx tsx experiments/10_sql_functions/run.ts
+npx tsx experiments/08_sql_functions/run.ts
 ```
 
 ## TypeScript Execution
@@ -143,16 +143,16 @@ Each experiment README should include:
 ## Experiment Numbering
 
 Experiments are numbered sequentially:
-- **exp-01**: Connection pooling
-- **exp-02**: Batch vs single queries
-- **exp-03**: Parallel batch processing
-- **exp-04**: Geometry simplification
-- **exp-05**: Batch algorithms (JSON expansion vs temp table)
-- **exp-06**: Spatial tile cache (negative result)
-- **exp-07**: Bounding box filter optimization (4.4% large-batch, 368% small-batch gains)
-- **exp-08**: SQL functions for batch queries
-- **exp-09**: JIT impact on query performance
-- **exp-10**: Minimal payload optimization
-- **exp-11**: Hierarchy lookup optimization
+- **exp-01**: Connection pooling — API pool=15, PgBouncer=25 optimal
+- **exp-02**: Batch vs single queries — single-point parallelizes better
+- **exp-03**: Parallel batch processing — Promise.all chunking 2.48× speedup
+- **exp-04**: Geometry simplification — simple_10 (10m): 2.48× speedup
+- **exp-05**: Batch algorithms — JSON expansion 3.8% faster than temp table
+- **exp-06**: Spatial tile cache — negative result (overhead > gains)
+- **exp-07**: Bounding box filter optimization — 4.4% large-batch, 368% small-batch gains
+- **exp-08**: SQL functions for batch queries — query precompilation optimization
+- **exp-09**: JIT impact on query performance — negligible impact (<3%) on I/O-bound workloads
+- **exp-10**: Minimal payload optimization — 29% latency reduction via query projection optimization
+- **exp-11**: Hierarchy lookup optimization — 97-99% speedup with precomputed hierarchies
 
 **Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.
