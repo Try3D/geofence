@@ -113,27 +113,35 @@ export class TileCache {
   }
 
   /**
-   * Find nearby cached tile within distance threshold
-   * Returns cached entry if found, undefined otherwise
+   * Find CLOSEST nearby cached tile within distance threshold
+   * Returns the nearest entry if found, undefined otherwise
    */
   getProximity(lat: number, lon: number, distanceM: number): CacheEntry | undefined {
-    for (const entry of this.cache.values()) {
+    let bestEntry: CacheEntry | undefined;
+    let bestKey: string | undefined;
+    let bestDist = Infinity;
+
+    for (const [key, entry] of this.cache.entries()) {
       const distance = this.haversineDistance(lat, lon, entry.lat, entry.lon);
-      if (distance <= distanceM) {
-        this.stats.hits++;
-        this.stats.proximityMatches++;
-        // Update LRU
-        const key = Array.from(this.cache.entries()).find(([_, e]) => e === entry)?.[0];
-        if (key) {
-          const index = this.lruOrder.indexOf(key);
-          if (index > -1) {
-            this.lruOrder.splice(index, 1);
-            this.lruOrder.push(key);
-          }
-        }
-        return entry;
+      if (distance <= distanceM && distance < bestDist) {
+        bestEntry = entry;
+        bestKey = key;
+        bestDist = distance;
       }
     }
+
+    if (bestEntry && bestKey) {
+      this.stats.hits++;
+      this.stats.proximityMatches++;
+      // Update LRU
+      const index = this.lruOrder.indexOf(bestKey);
+      if (index > -1) {
+        this.lruOrder.splice(index, 1);
+        this.lruOrder.push(bestKey);
+      }
+      return bestEntry;
+    }
+
     return undefined;
   }
 
@@ -175,6 +183,13 @@ export class TileCache {
   }
 
   /**
+   * Get all cache entries (for proximity searches)
+   */
+  getEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.cache.entries();
+  }
+
+  /**
    * Haversine distance between two points (meters)
    */
   private haversineDistance(
@@ -207,6 +222,10 @@ export class GeohashTileSystem {
   constructor(precision: number = 7, maxMemoryMB?: number) {
     this.precision = precision;
     this.cache = new TileCache(maxMemoryMB);
+  }
+
+  getEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.cache.getEntries();
   }
 
   getTile(lat: number, lon: number): string {
@@ -258,6 +277,10 @@ export class H3TileSystem {
     this.cache = new TileCache(maxMemoryMB);
   }
 
+  getEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.cache.getEntries();
+  }
+
   getTile(lat: number, lon: number): string {
     return h3.latLngToCell(lat, lon, this.resolution);
   }
@@ -305,6 +328,10 @@ export class QuadkeyTileSystem {
   constructor(zoom: number = 14, maxMemoryMB?: number) {
     this.zoom = zoom;
     this.cache = new TileCache(maxMemoryMB);
+  }
+
+  getEntries(): IterableIterator<[string, CacheEntry]> {
+    return this.cache.getEntries();
   }
 
   getTile(lat: number, lon: number): string {

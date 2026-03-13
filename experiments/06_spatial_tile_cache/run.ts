@@ -1,30 +1,19 @@
 #!/usr/bin/env node
 
 /**
- * Benchmarks three spatial tile caching systems (Geohash, H3, Quadkey)
- * against 1000 random points with proximity reuse matching.
+ * Benchmarks spatial tile cache with different proximity radii
  *
- * Hypothesis: Tile caching will be ineffective for random/moving-object workloads
- * because each new point lands in a different tile, resulting in ~0% cache hit rate.
+ * Hypothesis: Cache hits should skip DB queries entirely, providing
+ * measurable latency gains at the cost of some accuracy.
  *
  * Tests:
- *   1. /exp/06/batch-geohash  — Geohash-based tile caching (precision 7)
- *   2. /exp/06/batch-h3       — H3-based tile caching (resolution 8)
- *   3. /exp/06/batch-quadkey  — Quadkey-based tile caching (zoom 14)
+ *   1. /exp/06/no-cache — baseline, direct DB query (all 1000 points)
+ *   2. /exp/06/cache-1km — proximity cache, 1km radius
+ *   3. /exp/06/cache-3km — proximity cache, 3km radius
+ *   4. /exp/06/cache-5km — proximity cache, 5km radius
  *
- * Each endpoint returns:
- *   {
- *     systemType: "geohash" | "h3" | "quadkey",
- *     cacheStats: {
- *       exactHits: number,
- *       proximityHits: number,
- *       misses: number,
- *       hitRate: number (percentage),
- *       proximityAccuracyRate: number (percentage),
- *       memoryUsedMB: number,
- *     },
- *     results: array of point results
- *   }
+ * Each endpoint returns cacheStats showing hit rate, average hit latency,
+ * average miss (DB query) latency, and total request latency.
  */
 
 import path from "path";
@@ -36,44 +25,56 @@ const ROOT = path.join(__dirname, "../..");
 const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
 
 const bench = new Benchmark({
-  name: "Spatial Tile Cache Benchmark (Geohash vs H3 vs Quadkey)",
+  name: "Spatial Tile Cache — Proximity Radius Variants",
   resultsDir: path.join(ROOT, "benchmark-results", "06_spatial_tile_cache"),
 
   ...GEOFENCE_PRESETS,
 
   experiments: [
-    // ── Geohash (precision 7) ────────────────────────────────────────────────
+    // ── Baseline: No Cache ────────────────────────────────────────────────
     {
-      label: "geohash_1000_vus=10",
+      label: "no-cache_1000_vus=10",
       vus: 10,
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/06/batch-geohash`,
+        TARGET_URL: `${BASE_URL}/exp/06/no-cache`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },
 
-    // ── H3 (resolution 8) ────────────────────────────────────────────────────
+    // ── Cache with 1km Proximity Radius ────────────────────────────────────
     {
-      label: "h3_1000_vus=10",
+      label: "cache-1km_1000_vus=10",
       vus: 10,
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/06/batch-h3`,
+        TARGET_URL: `${BASE_URL}/exp/06/cache-1km`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },
 
-    // ── Quadkey (zoom 14) ────────────────────────────────────────────────────
+    // ── Cache with 3km Proximity Radius ────────────────────────────────────
     {
-      label: "quadkey_1000_vus=10",
+      label: "cache-3km_1000_vus=10",
       vus: 10,
       batchSize: 1000,
       extraEnv: {
         METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/06/batch-quadkey`,
+        TARGET_URL: `${BASE_URL}/exp/06/cache-3km`,
+        BODY: JSON.stringify({ points: randomPoints(1000) }),
+      },
+    },
+
+    // ── Cache with 5km Proximity Radius ────────────────────────────────────
+    {
+      label: "cache-5km_1000_vus=10",
+      vus: 10,
+      batchSize: 1000,
+      extraEnv: {
+        METHOD: "POST",
+        TARGET_URL: `${BASE_URL}/exp/06/cache-5km`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
       },
     },
