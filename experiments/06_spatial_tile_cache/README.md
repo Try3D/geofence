@@ -50,26 +50,19 @@ npx tsx experiments/06_spatial_tile_cache/run.ts
 
 ## Results
 
-### Accuracy (10,000 unique random points, warm Redis)
+### Combined Results (accuracy + k6 benchmark)
 
-| Variant | Radius | Hit Rate | Avg Jaccard | Recall | Precision | Cache Lat | DB Lat |
-|---------|--------|----------|-------------|--------|-----------|-----------|--------|
-| cache-1km | 1km | 10.27% | 0.9996 | 100.0% | 100.0% | 12.02ms | 13.06ms |
-| cache-2km | 2km | **100.00%** | 0.9996 | 100.0% | 100.0% | 13.68ms | — |
-| cache-5km | 5km | **100.00%** | 0.9996 | 100.0% | 100.0% | 13.87ms | — |
-| cache-10km | 10km | **100.00%** | 0.9996 | 100.0% | 100.0% | 13.99ms | — |
+10,000 unique random points for accuracy; k6: 10 VUs, 60s, fresh random point per iteration.
 
-**Accuracy is near-perfect (Jaccard=0.9996)** — polygon sets returned from cache match DB results with 100% recall and precision. The small Jaccard gap is from a handful of boundary cases.
+| Variant | Radius | Hit Rate | Jaccard | Recall | Precision | Throughput (req/s) | Avg Lat (ms) | P95 Lat (ms) |
+|---------|--------|----------|---------|--------|-----------|-------------------|--------------|--------------|
+| no-cache | — | — | — | — | — | **4,949** | 1.97 | 9.25 |
+| cache-1km | 1km | 10.27% | 0.9996 | 100.0% | 100.0% | 335 | 29.76 | 58.96 |
+| cache-2km | 2km | 100.00% | 0.9996 | 100.0% | 100.0% | 146 | 68.50 | 93.91 |
+| cache-5km | 5km | 100.00% | 0.9996 | 100.0% | 100.0% | 126 | 79.23 | 99.48 |
+| cache-10km | 10km | 100.00% | 0.9996 | 100.0% | 100.0% | 130 | 76.65 | 105.17 |
 
-### k6 Benchmark (10 VUs, 60s, fresh random point per iteration)
-
-| Variant | Throughput (req/s) | Avg Latency (ms) | P95 Latency (ms) | Failure Rate |
-|---------|-------------------|------------------|------------------|--------------|
-| **no-cache** | **4,949** | 1.97 | 9.25 | 0.00% |
-| cache-1km | 335 | 29.76 | 58.96 | 0.00% |
-| cache-2km | 146 | 68.50 | 93.91 | 0.00% |
-| cache-5km | 126 | 79.23 | 99.48 | 0.00% |
-| cache-10km | 130 | 76.65 | 105.17 | 0.00% |
+**Accuracy is near-perfect (Jaccard=0.9996)** — cached results match DB with 100% recall and precision. The small Jaccard gap is from a handful of boundary cases.
 
 ## Analysis
 
