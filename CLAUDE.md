@@ -4,35 +4,16 @@
 
 **When running benchmark scripts (npx tsx experiments/NN_*/run.ts):**
 - **DO NOT rely on the bash tool's default 2-minute timeout**
-- Set `timeout: 600000` (10 minutes minimum) when calling bash
 - **Better yet: Do NOT set a timeout at all** — let the command complete naturally
 - Benchmarks with 10 requests per variant × 3 batch sizes × 3 variants = ~30 total requests, each taking 100-1000ms
 - If you omit the timeout parameter, commands will run until completion
 
 **Mistake made:** Running benchmarks without timeout specified → bash tool kills command at 120 seconds → results not saved → lost benchmark data
 
-**Fix applied:** 
-- Reduced benchmark script requests from 50 to 10 per variant (for speed)
-- Always specify `timeout: 600000` for any `npx tsx experiments/*/run.ts` calls
-- Or specify no timeout at all and let it complete
-
-```bash
-# ❌ WRONG: Uses default 120s timeout, kills benchmark mid-run
-npx tsx experiments/08_sql_functions/run.ts
-
-# ✅ CORRECT: Explicit long timeout
-# timeout: 600000
-npx tsx experiments/08_sql_functions/run.ts
-
-# ✅ ALSO CORRECT: No timeout parameter = runs until done
-# (Do this for benchmark scripts that take 5-10 minutes)
-npx tsx experiments/08_sql_functions/run.ts
-```
-
 ## TypeScript Execution
 
 ```bash
-# Run TypeScript files directly
+# Run TypeScript files directly with tsx (no need to compile first)
 npx tsx experiments/05_batch_algorithms/run.ts
 npx tsx experiments/05_batch_algorithms/parity.ts
 ```

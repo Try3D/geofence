@@ -53,16 +53,45 @@ router.post(
   })
 );
 
-// Status endpoint: returns current JIT configuration (for logging)
+// Status endpoint: returns current JIT configuration
 router.get(
   "/status",
   asyncHandler(async (_req: Request, res: Response) => {
     try {
-      const result = await pool.query(
-        "SHOW jit; SHOW jit_above_cost; SHOW jit_inline_above_cost;"
-      );
+      const result = await pool.query("SHOW jit");
+      const jitStatus = result.rows[0]?.jit || "unknown";
       res.json({
-        jit_config: result.rows,
+        jit: jitStatus,
+      });
+    } catch (error) {
+      const message = formatError(error);
+      res.status(400).json({ error: message });
+    }
+  })
+);
+
+// Toggle JIT endpoint: changes PostgreSQL JIT setting and reloads config
+router.post(
+  "/toggle-jit",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const { jit } = req.body as { jit?: boolean };
+      const jitValue = jit === false ? "off" : "on";
+
+      // Set JIT configuration
+      await pool.query(`ALTER SYSTEM SET jit = ${jitValue}`);
+
+      // Reload PostgreSQL configuration
+      await pool.query("SELECT pg_reload_conf()");
+
+      // Verify the change took effect
+      const result = await pool.query("SHOW jit");
+      const newJitStatus = result.rows[0]?.jit || "unknown";
+
+      res.json({
+        success: true,
+        jit: newJitStatus,
+        message: `JIT set to ${jitValue}`,
       });
     } catch (error) {
       const message = formatError(error);

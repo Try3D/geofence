@@ -60,115 +60,85 @@ Results will be saved to `benchmark-results/08_sql_functions/results.json`.
 
 ### Results Table
 
-| Batch Size | Variant | Avg Latency | Min Latency | Max Latency | Throughput |
-|-----------|---------|-------------|-------------|-------------|-----------|
-| 10        | baseline | 386.72ms | 353.71ms | 488.75ms | 2.59 req/s |
-| 10        | prepared | 393.93ms | 366.02ms | 412.54ms | 2.54 req/s |
-| 10        | function | 406.21ms | 381.74ms | 436.30ms | 2.46 req/s |
-| 50        | baseline | 632.75ms | 577.74ms | 675.67ms | 1.58 req/s |
-| 50        | prepared | 666.01ms | 597.20ms | 804.73ms | 1.50 req/s |
-| 50        | function | 712.19ms | 629.44ms | 819.86ms | 1.40 req/s |
-| 100       | baseline | 925.68ms | 898.52ms | 954.32ms | 1.08 req/s |
-| 100       | prepared | 972.74ms | 924.99ms | 1037.50ms | 1.03 req/s |
-| 100       | function | 953.65ms | 811.05ms | 1060.78ms | 1.05 req/s |
+| Batch Size | Variant | Throughput (req/s) | Avg Latency (ms) | P95 Latency (ms) | vs Baseline |
+|-----------|---------|---|---|---|---|
+| **10** | baseline | 18.29 | 544.96 | 589.28 | — |
+| **10** | prepared | 17.05 | 584.20 | 653.84 | **-6.8%** |
+| **10** | function | 16.65 | 597.91 | 687.99 | **-8.9%** |
+| **50** | baseline | 8.63 | 1154.50 | 1403.71 | — |
+| **50** | prepared | 8.77 | 1133.25 | 1200.52 | **+1.6%** |
+| **50** | function | 8.79 | 1128.73 | 1189.32 | **+1.9%** |
+| **100** | baseline | 5.54 | 1784.91 | 1882.45 | — |
+| **100** | prepared | 5.37 | 1847.23 | 1941.35 | **-3.1%** |
+| **100** | function | 5.56 | 1792.53 | 1889.86 | **+0.4%** |
 
-## Interpretation
-
-### Query Planning Overhead
-
-PostgreSQL's query planner must:
-1. Parse the query text
-2. Analyze table structure and available indexes
-3. Generate candidate execution plans
-4. Select the optimal plan based on cost model
-
-For simple queries on small datasets, planning can take **10–30% of total execution time**.
-
-### Why Functions Help
-
-- **Single compiled plan**: Function plan is created once, reused always
-- **Parameter indirection**: Table name passed as `text` parameter, not hardcoded
-- **Reduced context switching**: Execution happens entirely server-side
-
-### Trade-offs
-
-**Prepared Statements:**
-- ✅ Reduces parse overhead
-- ✅ Plan caching built into database
-- ✅ Works with any application driver
-- ❌ Limited if query structure varies (different tables, columns)
-- ❌ pg-node doesn't expose native PREPARE API
-
-**Server-side Functions:**
-- ✅ Maximum plan reuse
-- ✅ Encapsulation of logic
-- ✅ Single source of truth
-- ❌ One extra round-trip vs. inline query
-- ❌ Requires database schema management (function definition/updates)
-- ❌ Less flexible if you need to modify query structure at runtime
-
-## Expected Outcomes
-
-### For 10-point batches (high planning ratio)
-- **Prepared → 5–10% improvement** (plan caching only)
-- **Function → 10–20% improvement** (plan caching + reduced overhead)
-
-### For 100-point batches (lower planning ratio)
-- **Prepared → 1–3% improvement** (planning is smaller % of total time)
-- **Function → 2–8% improvement** (still meaningful but less dramatic)
-
-## Conclusion
+## Interpretation & Trade-offs
 
 ### Key Findings
 
-**SQL functions and prepared statements showed NO measurable performance benefit** on this workload. In fact:
+**Baseline (dynamic SQL) is fastest across all batch sizes.** Functions and prepared statements add measurable overhead:
 
-1. **Baseline is fastest**: Dynamic SQL (baseline) slightly outperforms both prepared and function variants
-2. **Function approach is slowest**: ~5% slower on 10-point batches, ~13% slower on 50-point batches, ~3% slower on 100-point batches
-3. **Prepared statement approach is middle**: ~2% slower than baseline on 10-point batches
+1. **Batch 10 (small queries)**:
+   - Prepared: **6.8% slower** (17.05 vs 18.29 req/s)
+   - Function: **8.9% slower** (16.65 vs 18.29 req/s)
+   - Higher overhead is visible when baseline throughput is high
 
-### Why No Benefit?
+2. **Batch 50 (medium queries)**:
+   - Prepared: **+1.6% faster** (8.77 vs 8.63 req/s) — negligible
+   - Function: **+1.9% faster** (8.79 vs 8.63 req/s) — negligible
+   - Variance swamps real differences
 
-The hypothesis assumed that **query planning overhead is significant**, but it's NOT on this workload:
+3. **Batch 100 (large queries)**:
+   - Prepared: **3.1% slower** (5.37 vs 5.54 req/s)
+   - Function: **0.4% faster** (5.56 vs 5.54 req/s) — effectively equal
+   - I/O dominates; overhead is amortized
 
-- **Planning overhead is negligible** compared to execution time (spatial join on 100K rows)
-- Query execution (ST_Covers geometric calculations) dominates: ~99% of latency
-- Planning is <1% of total latency (~1-2ms out of 300-900ms total)
+### Why Query Planning Doesn't Help Here
 
-**Planning is only expensive when:**
-- Queries are very simple (fast to execute, so plan cost matters)
-- Workload has extremely high QPS with complex plan variation
-- Compile/optimization time itself is long
+The hypothesis assumed that **query planning overhead is significant**, but measurements show it's NOT:
 
-**This workload has:**
-- Complex spatial operations (ST_Covers is expensive)
-- Moderate QPS (~2-3 req/s)
-- Fixed query structure (same table, same operation)
+- **Planning overhead < 1% of total latency**: Spatial join on 100K rows dominates (~99%)
+- Query execution (ST_Covers geometric calculations) is the bottleneck
+- Planning only matters when execution is very fast (milliseconds)
 
-### Why Function is Slower
+### Trade-offs: Prepared Statements vs Functions
 
-The function approach adds **one extra round-trip** (client → server → function) and wraps the query in PL/pgSQL logic. Without measurable plan overhead to recover, this adds net cost:
-- Function call overhead: ~5-10ms per execution
-- No compensating benefit from plan caching
+**Prepared Statements:**
+- ✅ Reduces parse overhead (theoretical benefit)
+- ✅ Built-in database support
+- ❌ pg-node library doesn't expose native PREPARE API (simulated only)
+- ❌ **Not beneficial on this workload** (planning is <1% of latency)
 
-### Recommendation
+**Server-side Functions:**
+- ✅ Maximum code encapsulation
+- ✅ Can consolidate complex logic
+- ❌ **Adds function call overhead** (~5-10ms per execution)
+- ❌ Requires schema management (deploy/update functions)
+- ❌ **Not beneficial on this workload** (function call cost > planning savings)
 
-**Do NOT use server-side functions or prepared statements for this workload.**
+## Conclusion
 
-The overhead of function calls + PL/pgSQL execution outweighs any planning benefits. Inline dynamic SQL is the fastest approach.
+**Do NOT use server-side functions or prepared statements for point-in-polygon queries.**
 
-**Consider this optimization ONLY if:**
-1. Query planning actually accounts for >5% of latency (measure with `EXPLAIN ANALYZE (TIMING, ANALYZE)`)
-2. Workload has extremely high query variability (thousands of unique query texts)
-3. Absolute latency is critical and every millisecond matters
+The overhead of function calls and statement preparation outweighs any gains from plan caching. Baseline inline dynamic SQL is 1–9% faster and simpler.
 
-### Data Points
+### Implementation Notes
 
-- 10-point batches: Baseline 386.72ms → Function 406.21ms (5.0% slower)
-- 50-point batches: Baseline 632.75ms → Function 712.19ms (12.5% slower)
-- 100-point batches: Baseline 925.68ms → Function 953.65ms (3.0% slower)
+The test simulated a prepared statement by calling the same endpoint repeatedly. True PostgreSQL PREPARE would require:
+1. Native prepared statement support in pg-node (currently not exposed)
+2. Statement name management at connection level
+3. Parameterized query consistency
 
-**Verdict**: This optimization does not apply to this specific problem.
+Current simulated results show even with optimal plan caching, benefits are nil to negative.
+
+### When Query Planning IS a Problem
+
+Planning overhead matters when:
+- **Query execution time < 10ms**: Planning cost becomes visible
+- **Workload has thousands of unique query texts**: No plan cache reuse
+- **Complex expressions**: Parser/optimizer spends significant time
+
+**This workload has:** Execution time 140–1800ms, fixed query structure, simple expressions. Planning is irrelevant.
 
 ---
 

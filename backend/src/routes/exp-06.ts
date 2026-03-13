@@ -6,7 +6,11 @@ import {
   parseCoordinates,
   parseTable,
 } from "../utils/validators";
-import { GeohashTileSystem, H3TileSystem, QuadkeyTileSystem, CacheStats } from "../utils/tile-cache";
+import {
+  GeohashTileSystem,
+  H3TileSystem,
+  QuadkeyTileSystem,
+} from "../utils/tile-cache";
 import { pool } from "../db";
 
 const router = express.Router();
@@ -17,7 +21,10 @@ const h3Cache = new H3TileSystem(8, 1024);
 const quadkeyCache = new QuadkeyTileSystem(14, 1024);
 
 // Track accuracy of proximity matches
-let proximityAccuracy: { correct: number; total: number } = { correct: 0, total: 0 };
+let proximityAccuracy: { correct: number; total: number } = {
+  correct: 0,
+  total: 0,
+};
 
 /**
  * Query with geohash tile caching
@@ -45,7 +52,13 @@ router.post(
         // Try exact tile match
         const exact = geohashCache.get(lat, lon);
         if (exact.hit && exact.entry) {
-          results.push({ idx: i, matches: exact.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: exact.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: "exact" });
           continue;
         }
@@ -69,20 +82,27 @@ router.post(
              FROM ${table} p
              WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
              LIMIT 1000`,
-            [lon, lat]
+            [lon, lat],
           );
           const dbIds = new Set(dbResult.rows.map((r: any) => r.osm_id));
           const cachedIds = new Set(proximity.entry.polygonIds);
-          const isAccurate = dbIds.size === cachedIds.size &&
+          const isAccurate =
+            dbIds.size === cachedIds.size &&
             Array.from(dbIds).every((id) => cachedIds.has(id));
-          
+
           if (isAccurate) {
             proximityAccuracy.correct++;
           }
           proximityAccuracy.total++;
           geohashCache.getStats(); // This internally tracks accuracy
 
-          results.push({ idx: i, matches: proximity.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: proximity.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: `proximity_${proximityType}` });
           continue;
         }
@@ -93,13 +113,16 @@ router.post(
            FROM ${table} p
            WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
            LIMIT 1000`,
-          [lon, lat]
+          [lon, lat],
         );
 
         const polygonIds = dbResult.rows.map((r: any) => r.osm_id);
         geohashCache.set(lat, lon, polygonIds);
 
-        results.push({ idx: i, matches: polygonIds.map((id) => ({ osm_id: id, name: null })) });
+        results.push({
+          idx: i,
+          matches: polygonIds.map((id) => ({ osm_id: id, name: null })),
+        });
         cacheHits.push({ idx: i, type: "db_miss" });
       }
 
@@ -115,9 +138,13 @@ router.post(
           proximityHits: stats.proximityMatches,
           misses: stats.misses,
           memoryMB: stats.memoryMB.toFixed(2),
-          proximityAccuracy: proximityAccuracy.total > 0
-            ? ((proximityAccuracy.correct / proximityAccuracy.total) * 100).toFixed(2)
-            : "N/A",
+          proximityAccuracy:
+            proximityAccuracy.total > 0
+              ? (
+                  (proximityAccuracy.correct / proximityAccuracy.total) *
+                  100
+                ).toFixed(2)
+              : "N/A",
         },
         cacheHits,
       });
@@ -125,7 +152,7 @@ router.post(
       const message = formatError(error);
       res.status(400).json({ error: message });
     }
-  })
+  }),
 );
 
 /**
@@ -154,7 +181,13 @@ router.post(
         // Try exact tile match
         const exact = h3Cache.get(lat, lon);
         if (exact.hit && exact.entry) {
-          results.push({ idx: i, matches: exact.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: exact.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: "exact" });
           continue;
         }
@@ -178,19 +211,26 @@ router.post(
              FROM ${table} p
              WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
              LIMIT 1000`,
-            [lon, lat]
+            [lon, lat],
           );
           const dbIds = new Set(dbResult.rows.map((r: any) => r.osm_id));
           const cachedIds = new Set(proximity.entry.polygonIds);
-          const isAccurate = dbIds.size === cachedIds.size &&
+          const isAccurate =
+            dbIds.size === cachedIds.size &&
             Array.from(dbIds).every((id) => cachedIds.has(id));
-          
+
           if (isAccurate) {
             proximityAccuracy.correct++;
           }
           proximityAccuracy.total++;
 
-          results.push({ idx: i, matches: proximity.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: proximity.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: `proximity_${proximityType}` });
           continue;
         }
@@ -201,13 +241,16 @@ router.post(
            FROM ${table} p
            WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
            LIMIT 1000`,
-          [lon, lat]
+          [lon, lat],
         );
 
         const polygonIds = dbResult.rows.map((r: any) => r.osm_id);
         h3Cache.set(lat, lon, polygonIds);
 
-        results.push({ idx: i, matches: polygonIds.map((id) => ({ osm_id: id, name: null })) });
+        results.push({
+          idx: i,
+          matches: polygonIds.map((id) => ({ osm_id: id, name: null })),
+        });
         cacheHits.push({ idx: i, type: "db_miss" });
       }
 
@@ -223,9 +266,13 @@ router.post(
           proximityHits: stats.proximityMatches,
           misses: stats.misses,
           memoryMB: stats.memoryMB.toFixed(2),
-          proximityAccuracy: proximityAccuracy.total > 0
-            ? ((proximityAccuracy.correct / proximityAccuracy.total) * 100).toFixed(2)
-            : "N/A",
+          proximityAccuracy:
+            proximityAccuracy.total > 0
+              ? (
+                  (proximityAccuracy.correct / proximityAccuracy.total) *
+                  100
+                ).toFixed(2)
+              : "N/A",
         },
         cacheHits,
       });
@@ -233,7 +280,7 @@ router.post(
       const message = formatError(error);
       res.status(400).json({ error: message });
     }
-  })
+  }),
 );
 
 /**
@@ -262,7 +309,13 @@ router.post(
         // Try exact tile match
         const exact = quadkeyCache.get(lat, lon);
         if (exact.hit && exact.entry) {
-          results.push({ idx: i, matches: exact.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: exact.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: "exact" });
           continue;
         }
@@ -286,19 +339,26 @@ router.post(
              FROM ${table} p
              WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
              LIMIT 1000`,
-            [lon, lat]
+            [lon, lat],
           );
           const dbIds = new Set(dbResult.rows.map((r: any) => r.osm_id));
           const cachedIds = new Set(proximity.entry.polygonIds);
-          const isAccurate = dbIds.size === cachedIds.size &&
+          const isAccurate =
+            dbIds.size === cachedIds.size &&
             Array.from(dbIds).every((id) => cachedIds.has(id));
-          
+
           if (isAccurate) {
             proximityAccuracy.correct++;
           }
           proximityAccuracy.total++;
 
-          results.push({ idx: i, matches: proximity.entry.polygonIds.map((id) => ({ osm_id: id, name: null })) });
+          results.push({
+            idx: i,
+            matches: proximity.entry.polygonIds.map((id) => ({
+              osm_id: id,
+              name: null,
+            })),
+          });
           cacheHits.push({ idx: i, type: `proximity_${proximityType}` });
           continue;
         }
@@ -309,13 +369,16 @@ router.post(
            FROM ${table} p
            WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
            LIMIT 1000`,
-          [lon, lat]
+          [lon, lat],
         );
 
         const polygonIds = dbResult.rows.map((r: any) => r.osm_id);
         quadkeyCache.set(lat, lon, polygonIds);
 
-        results.push({ idx: i, matches: polygonIds.map((id) => ({ osm_id: id, name: null })) });
+        results.push({
+          idx: i,
+          matches: polygonIds.map((id) => ({ osm_id: id, name: null })),
+        });
         cacheHits.push({ idx: i, type: "db_miss" });
       }
 
@@ -331,9 +394,13 @@ router.post(
           proximityHits: stats.proximityMatches,
           misses: stats.misses,
           memoryMB: stats.memoryMB.toFixed(2),
-          proximityAccuracy: proximityAccuracy.total > 0
-            ? ((proximityAccuracy.correct / proximityAccuracy.total) * 100).toFixed(2)
-            : "N/A",
+          proximityAccuracy:
+            proximityAccuracy.total > 0
+              ? (
+                  (proximityAccuracy.correct / proximityAccuracy.total) *
+                  100
+                ).toFixed(2)
+              : "N/A",
         },
         cacheHits,
       });
@@ -341,7 +408,7 @@ router.post(
       const message = formatError(error);
       res.status(400).json({ error: message });
     }
-  })
+  }),
 );
 
 /**

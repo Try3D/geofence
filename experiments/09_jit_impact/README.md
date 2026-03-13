@@ -1,213 +1,135 @@
-# 09 — JIT Impact on Small Query Workloads
+# 09 — JIT Impact on Query Performance
 
 ## Hypothesis
 
-Just-In-Time (JIT) compilation can **hurt latency on small, frequently-executed queries** because the overhead of compilation outweighs the benefits of optimized code. For batch lookups with 10–100 points (short execution time), JIT may add more cost than value.
-
-PostgreSQL's JIT compiler (introduced in v11) optimizes long-running queries by compiling expensive operations to machine code. However, **compilation has fixed overhead** (~5–15ms per query on first execution), which is only profitable if query execution time is proportionally long.
+Just-In-Time (JIT) compilation may hurt latency on small, frequently-executed queries because the fixed compilation overhead (~5–15ms) outweighs benefits for short-running queries. For batch lookups with 10–100 points, JIT overhead may be a net cost.
 
 Expected impact:
-- **Small batches (10–50 points):** JIT disabled is 3–8% faster
-- **Large batches (500+ points):** JIT enabled may be 2–5% faster (compilation pays off)
-- **Conclusion:** For this workload (avg batch ~50 points), **disable JIT globally**
+- **Small batches (10–50 points):** JIT OFF is 3–8% faster
+- **Large batches (500+ points):** JIT ON may be 2–5% faster
+- **Null hypothesis:** JIT impact is negligible (<3%) because workload is I/O-bound, not CPU-bound
 
 ## Method
 
-Compare query latency with JIT enabled vs. disabled:
+Automated two-phase load testing with k6, toggling JIT between each run:
 
-1. **Phase 1 (JIT ON)**: Capture baseline with default PostgreSQL JIT enabled
-2. **Phase 2 (JIT OFF)**: Manually toggle JIT off, run identical benchmark
-3. **Comparison**: Calculate % improvement with JIT disabled
+1. Run 60s k6 benchmark with 10 VUs at batch sizes 10, 50, 100 **with JIT OFF**
+2. Run identical benchmarks **with JIT ON**
+3. Compare throughput, latency (p95/p99), and failure rates
 
-### JIT Configuration
-
-PostgreSQL JIT settings:
-- `jit` — Enable/disable JIT (on | off)
-- `jit_above_cost` — Query cost threshold for JIT compilation (default: 100,000)
-- `jit_inline_above_cost` — Threshold for inlining (default: 500,000)
-
-For this workload, we'll test `jit = off` (disable completely).
+JIT toggling via automated `/exp/09/toggle-jit` endpoint (requires PostgreSQL superuser).
 
 ## How to reproduce
 
 ```bash
-# Terminal 1: Start backend
+# Terminal 1: Start backend (must run as superuser-enabled PostgreSQL)
 npm run dev
 
-# Terminal 2a: Check current JIT state
-psql -h localhost -U gis -d gis -c "SHOW jit; SHOW jit_above_cost;"
-
-# Terminal 2b: DISABLE JIT (run once before benchmark)
-psql -h localhost -U gis -d gis -c "ALTER SYSTEM SET jit = off; SELECT pg_reload_conf();"
-
-# Terminal 2c: Run benchmark (with JIT OFF)
+# Terminal 2: Run full benchmark (auto-toggles JIT between experiments)
 npx tsx experiments/09_jit_impact/run.ts
-
-# Terminal 2d: RESTORE JIT to default (run once after benchmark)
-psql -h localhost -U gis -d gis -c "ALTER SYSTEM SET jit = on; SELECT pg_reload_conf();"
 ```
 
-Results will be saved to `benchmark-results/09_jit_impact/results.json`.
+Results saved to `benchmark-results/09_jit_impact/result.json` with full k6 metrics.
 
 ## Results
 
 ### Benchmark Configuration
-- **Batch sizes tested**: 10, 50, 100 points
-- **Requests per batch size**: 30
-- **Total requests**: 90 (30 requests × 3 batch sizes)
-- **Workload**: Same random points within Spain's bounding box
-- **Table**: planet_osm_polygon
+- **Batch sizes**: 10, 50, 100 points
+- **Duration per variant**: 60 seconds
+- **Virtual users (VUs)**: 10
+- **JIT variants**: OFF and ON (6 experiments total)
+- **Load test framework**: k6 with automated JIT toggling
+- **Query endpoint**: POST `/exp/09/lookup` (planet_osm_polygon lookup)
 
-### Results (Current Rerun — JIT State Pending Verification)
+### k6 Metrics Captured
+- **Throughput** (req/s): Requests per second
+- **P95 Latency** (ms): 95th percentile latency
+- **P99 Latency** (ms): 99th percentile latency
+- **Avg Latency** (ms): Mean latency across all requests
+- **Failure Rate**: % of failed requests (threshold: <5%)
 
-| Batch Size | Avg Latency | Min Latency | Max Latency | Throughput |
-|-----------|-------------|-------------|-------------|-----------|
-| 10        | 423.4ms | 381.34ms | 523.69ms | 2.36 req/s |
-| 50        | 651.78ms | 577.38ms | 714.41ms | 1.53 req/s |
-| 100       | 922.14ms | 839.53ms | 997.07ms | 1.08 req/s |
+### Results
 
-**Note**: Results saved with `jitState: "check_manually"`. JIT ON/OFF comparison tables from earlier run omitted due to JIT state uncertainty. Re-run both JIT ON and JIT OFF phases to regenerate comparison data.
+| Batch Size | JIT State | Throughput (req/s) | Avg Latency (ms) | P95 Latency (ms) | Improvement |
+|---|---|---|---|---|---|
+| **10** | OFF | 70.15 | 142.23 | 161.70 | — |
+| **10** | ON | 16.41 | 607.58 | 654.19 | **-76.6%** (JIT slower) |
+| **50** | OFF | 14.63 | 680.96 | 730.70 | — |
+| **50** | ON | 8.69 | 1146.27 | 1296.38 | **-40.6%** (JIT slower) |
+| **100** | OFF | 7.04 | 1416.13 | 1539.97 | — |
+| **100** | ON | 5.39 | 1835.30 | 1963.44 | **-23.4%** (JIT slower) |
 
 ## Interpretation
 
-### Why JIT Hurts Small Queries
+### Key Finding: JIT Makes Queries SLOWER
 
-1. **Compilation Overhead**: JIT compilation adds ~5–15ms per unique query
-2. **Small Execution Time**: Batch lookup on 10 points takes ~5–20ms total
-3. **Negative ROI**: Compilation cost > execution time
-4. **Example**: 15ms compilation + 10ms execution = 25ms with JIT vs 10ms without
+**Contrary to the hypothesis, JIT is a net performance cost on this workload:**
 
-### Why JIT Helps Large Queries
+- **Batch 10**: JIT OFF is **4.3× faster** (70.15 vs 16.41 req/s)
+- **Batch 50**: JIT OFF is **1.7× faster** (14.63 vs 8.69 req/s)
+- **Batch 100**: JIT OFF is **1.3× faster** (7.04 vs 5.39 req/s)
 
-For 500-point batches (execution time ~200–500ms):
-- Compilation overhead is amortized
-- JIT can optimize expensive geometric operations (ST_Covers)
-- Machine code execution is faster than PostgreSQL bytecode
+### Why JIT Hurts This Workload
 
-### Decision Point
+1. **JIT compilation overhead is significant (~400–500ms)**
+   - Even though overhead should be amortized, results show per-query penalty
+   - Hypothesis predicted overhead would be ~5–15ms; actual impact is 400–500ms per query
+   - May indicate: JIT being triggered on EVERY query, not cached compilations
 
-**Disable JIT if:**
-- Average query execution time < 20ms
-- QPS > 100 req/s (many unique query plans)
-- Workload is many small queries (not few large ones)
+2. **I/O-bound, not CPU-bound**
+   - ST_Covers (PostGIS C code) already optimized
+   - Bottleneck is disk I/O for 100K polygon scan
+   - JIT cannot optimize I/O operations
+   - CPU time savings are microscopic compared to I/O time
 
-**Keep JIT enabled if:**
-- Average query execution time > 50ms
-- Complex expressions benefit from optimization
-- Willing to accept startup latency spike
+3. **Query plan compiled repeatedly**
+   - May indicate plan cache is not working as expected
+   - Or JIT compilation threshold (`jit_above_cost` = 100,000) is set too low
+   - Each request incurs full JIT cost with no amortization
 
-## Expected Outcomes
-
-### Key Findings
-
-### Key Findings
-
-**Note**: The current results.json contains a single benchmark run. To fully test the JIT impact hypothesis, you need to:
-
-1. **Phase 1**: Run with JIT ON (PostgreSQL default)
-   - `psql -c "ALTER SYSTEM SET jit = on; SELECT pg_reload_conf();"`
-   - `npx tsx experiments/09_jit_impact/run.ts`
-
-2. **Phase 2**: Run with JIT OFF
-   - `psql -c "ALTER SYSTEM SET jit = off; SELECT pg_reload_conf();"`
-   - `npx tsx experiments/09_jit_impact/run.ts`
-
-3. Compare the two result sets to draw conclusions about JIT impact
-
-**Earlier findings from previous runs** suggested JIT had negligible impact (within ±2.5% across batch sizes).
-
-### Why JIT Impact Is Expected to Be Negligible
-
-The hypothesis predicts that JIT compilation overhead would have minimal impact on small queries. The reasoning:
-
-1. **Query execution is dominated by I/O** (~300-1000ms total)
-    - ST_Covers operation on 100K rows dominates
-    - JIT compilation overhead is <1% of execution time
-
-2. **JIT is optimized for CPU-heavy workloads**
-    - Geometric calculations are in PostgreSQL C code (already optimized)
-    - JIT would help on complex PL/pgSQL logic or expensive expression evaluation
-    - This workload is I/O bound (table scans, index lookups), not CPU bound
-
-3. **Query plan compilation is negligible**
-    - Query plan is reused across requests
-    - PostgreSQL's native code is already highly optimized
-    - No complex bytecode interpretation to compile away
-
-4. **Batch size doesn't change the fundamental constraint**
-    - Small batches (10 pts): limited by table scan efficiency
-    - Large batches (100 pts): limited by I/O throughput
-    - JIT gains would be at most 1-3% on CPU work, swamped by I/O time
-
-### When JIT WOULD Help
-
-JIT compilation would be beneficial if:
-- Query execution time > 10 seconds
-- Heavy use of PL/pgSQL logic
-- Complex arithmetic/expression evaluation
-- Tight loops over large result sets
-
-**This workload has none of these characteristics.**
+4. **No complex expressions to optimize**
+   - Query is: `LATERAL JOIN + ST_Covers(...)`
+   - No tight loops, complex PL/pgSQL, or expensive expression evaluation
+   - JIT is designed for these; this workload has none
 
 ### Recommendation
 
-**PENDING VALIDATION**: Complete the two-phase benchmark (JIT ON vs JIT OFF) to confirm impact.
+**DISABLE JIT globally: `ALTER SYSTEM SET jit = off;`**
 
-**Expected recommendation** (based on hypothesis): JIT setting should NOT matter for this workload. Keep PostgreSQL defaults (JIT ON) for simplicity unless measurements show >3% impact either way.
+JIT provides no benefit and adds substantial overhead. The compilation cost far outweighs any CPU optimizations.
 
-### Data Points
+**Optimization priorities** (by impact):
+1. **Bounding box filters** (exp-07): +4.4% to +368% depending on batch size
+2. **Batch algorithms** (exp-05): 3.8% optimization on JSON expansion
+3. **Connection pooling** (exp-01): steady-state throughput improvement
+4. **JIT: DISABLE** (this experiment): -23% to -76% penalty
 
-**Throughput comparison (requests/second):**
-- 10 pts: 2.59 req/s (OFF) vs 2.58 req/s (ON) = same
-- 50 pts: 1.54 req/s (OFF) vs 1.58 req/s (ON) = same
-- 100 pts: 1.07 req/s (OFF) vs 1.07 req/s (ON) = same
+## Technical Details
 
-**Verdict**: JIT is a red herring for this optimization. Focus on more impactful optimizations.
+### PostgreSQL JIT Configuration
 
----
+- `jit` — Enable/disable JIT (on | off)
+- `jit_above_cost` — Query cost threshold for JIT compilation (default: 100,000)
+- `jit_inline_above_cost` — Threshold for inlining (default: 500,000)
+- `jit_above_cost` may be set too low, causing expensive compilation on every query
 
-## Configuration Changes
+### Automated Toggling
 
-### To disable JIT (globally, affects all connections):
+The benchmark uses `/exp/09/toggle-jit` backend endpoint to automatically toggle JIT before each experiment via:
 ```sql
-ALTER SYSTEM SET jit = off;
+ALTER SYSTEM SET jit = on/off;
 SELECT pg_reload_conf();
 ```
 
-### To disable JIT (session-level, only current connection):
-```sql
-SET jit = off;
--- Now run query
-SET jit = on;  -- Restore
-```
+This ensures clean before/after measurement without manual intervention.
 
-### To restore defaults:
-```sql
-ALTER SYSTEM SET jit = on;
-SELECT pg_reload_conf();
-```
+## Limitations & Notes
 
-## Monitoring
-
-Check JIT compilation stats (PostgreSQL 14+):
-```sql
-SELECT query, jit_functions, jit_generation_time, execution_time
-FROM pg_stat_statements
-WHERE query LIKE '%batch%'
-ORDER BY execution_time DESC;
-```
-
-## Limitations/Notes
-
-- JIT overhead is higher on first execution (plan not cached)
-- Subsequent executions may show different characteristics
-- PostgreSQL version affects JIT behavior (v11, v12, v13, v14, v15 all differ)
-- Test represents a specific workload; YMMV on other query patterns
-- Connection pooling affects plan caching (affects JIT amortization)
-
-## Next Steps
-
-1. If JIT off shows 5%+ improvement, make it permanent
-2. Monitor production QPS and query mixes to validate
-3. Consider per-client JIT toggling if mixed workloads exist
-4. Re-test after PostgreSQL version upgrades
+1. **Superuser required**: `ALTER SYSTEM` needs PostgreSQL superuser permissions
+2. **Fresh config reload**: Config is reloaded system-wide; active connections persist old config for ~1s
+3. **PostgreSQL version**: Results depend on JIT implementation (v11+ differs across versions)
+4. **Plan cache state**: Connection pooling can affect plan reuse; here we restart backend between tests for isolation
+5. **Unexpected overhead**: JIT showing significant (400–500ms) per-query cost suggests either:
+   - Query is being recompiled on every request (plan cache miss?)
+   - JIT threshold is misconfigured for this workload
+   - Database version or configuration has suboptimal JIT settings
