@@ -7,53 +7,61 @@ import { pool } from "../db";
 
 const router = express.Router();
 
+// Two Redis clients:
+// - redis: GEO index (geofence:geo) + polygon data (geofence:data:<member>)
+// - Uses maxmemory-policy allkeys-lru so Redis evicts LRU entries automatically
 const redis = new Redis({ host: "localhost", port: 6379 });
 
-function haversineDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
+// Configure LRU on startup (100MB cap, LRU eviction)
+redis.config("SET", "maxmemory", "100mb").catch(() => {});
+redis.config("SET", "maxmemory-policy", "allkeys-lru").catch(() => {});
 
-function cacheKey(lat: number, lon: number, precision: number): string {
-  return `geofence:${lat.toFixed(precision)}:${lon.toFixed(precision)}`;
+const GEO_KEY = "geofence:geo";
+
+/**
+ * Member name encodes lat/lon so we can retrieve it from GEOSEARCH results
+ */
+function geoMember(lat: number, lon: number): string {
+  return `${lat.toFixed(6)}:${lon.toFixed(6)}`;
 }
 
 async function findClosestCachedEntry(
   lat: number,
   lon: number,
-  maxDistanceM: number
+  radiusM: number
 ): Promise<{ polygonIds: string[]; distanceM: number } | null> {
-  const keys = await redis.keys("geofence:*:*");
-  let closest: { distance: number; polygonIds: string[] } | null = null;
+  // GEOSEARCH: find nearest cached point within radiusM, return 1 result with distance
+  const results = await redis.call(
+    "GEOSEARCH",
+    GEO_KEY,
+    "FROMLONLAT", lon, lat,
+    "BYRADIUS", radiusM, "m",
+    "ASC",
+    "COUNT", 1,
+    "WITHDIST"
+  ) as any[];
 
-  for (const key of keys) {
-    const parts = key.split(":");
-    if (parts.length !== 3) continue;
-    const cachedLat = parseFloat(parts[1]);
-    const cachedLon = parseFloat(parts[2]);
-    const dist = haversineDistance(lat, lon, cachedLat, cachedLon);
-    if (dist <= maxDistanceM && (!closest || dist < closest.distance)) {
-      const cached = await redis.get(key);
-      if (cached) closest = { distance: dist, polygonIds: JSON.parse(cached) };
-    }
-  }
+  if (!results || results.length === 0) return null;
 
-  return closest
-    ? { polygonIds: closest.polygonIds, distanceM: Math.round(closest.distance) }
-    : null;
+  // results[0] = [member, distance] — distance in meters (unit matches BYRADIUS unit)
+  const [member, distStr] = results[0];
+  const distanceM = Math.round(parseFloat(distStr));
+
+  const dataKey = `geofence:data:${member}`;
+  const cached = await redis.get(dataKey);
+  if (!cached) return null;
+
+  return { polygonIds: JSON.parse(cached), distanceM };
+}
+
+async function storeInCache(lat: number, lon: number, polygonIds: string[]) {
+  const member = geoMember(lat, lon);
+  const dataKey = `geofence:data:${member}`;
+
+  await Promise.all([
+    redis.geoadd(GEO_KEY, lon, lat, member),
+    redis.setex(dataKey, 3600, JSON.stringify(polygonIds)),
+  ]);
 }
 
 async function queryDb(table: string, lat: number, lon: number) {
@@ -69,7 +77,6 @@ async function queryDb(table: string, lat: number, lon: number) {
 
 /**
  * POST /exp/06/no-cache — single point, direct DB query
- * Body: { lat, lon, table? }
  */
 router.post(
   "/no-cache",
@@ -92,10 +99,9 @@ router.post(
 );
 
 /**
- * Proximity cache route factory — single point
- * Body: { lat, lon, table? }
+ * Proximity cache route factory — uses GEOSEARCH, O(log n)
  */
-function createProximityCacheRoute(radiusM: number, precision: number) {
+function createProximityCacheRoute(radiusM: number) {
   return asyncHandler(async (req: Request, res: Response) => {
     try {
       const { lat: latRaw, lon: lonRaw, table: tableRaw } = req.body;
@@ -109,8 +115,7 @@ function createProximityCacheRoute(radiusM: number, precision: number) {
       if (cached) {
         const latencyMs = performance.now() - t0;
         return res.json({
-          lat,
-          lon,
+          lat, lon,
           polygonIds: cached.polygonIds,
           source: "cache",
           distanceM: cached.distanceM,
@@ -122,8 +127,7 @@ function createProximityCacheRoute(radiusM: number, precision: number) {
       const polygonIds = await queryDb(table, lat, lon);
       const latencyMs = performance.now() - t0;
 
-      const key = cacheKey(lat, lon, precision);
-      await redis.setex(key, 3600, JSON.stringify(polygonIds));
+      await storeInCache(lat, lon, polygonIds);
 
       res.json({ lat, lon, polygonIds, source: "db", latencyMs: latencyMs.toFixed(2) });
     } catch (error) {
@@ -132,10 +136,10 @@ function createProximityCacheRoute(radiusM: number, precision: number) {
   });
 }
 
-router.post("/cache-1km", createProximityCacheRoute(1000, 3));
-router.post("/cache-2km", createProximityCacheRoute(2000, 3));
-router.post("/cache-5km", createProximityCacheRoute(5000, 2));
-router.post("/cache-10km", createProximityCacheRoute(10000, 2));
+router.post("/cache-1km",  createProximityCacheRoute(1000));
+router.post("/cache-2km",  createProximityCacheRoute(2000));
+router.post("/cache-5km",  createProximityCacheRoute(5000));
+router.post("/cache-10km", createProximityCacheRoute(10000));
 
 router.post("/flush", asyncHandler(async (_req: Request, res: Response) => {
   await redis.flushdb();

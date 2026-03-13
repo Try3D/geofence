@@ -15,7 +15,7 @@ experiments that drove the production configuration.
 | [03](experiments/03_parallel_batch/) | Parallel Batch | Promise.all chunking: 2.48× over serial at vus=5 |
 | [04](experiments/04_geometry_simplification/) | Geometry Simplification | simple_10 (10 m): 2.48× speedup, IoU=0.9993 |
 | [05](experiments/05_batch_algorithms/) | Batch Algorithm Comparison | **JSON expansion is 3.8% faster than temp table; 26.4% faster than serial LATERAL** |
-| [06](experiments/06_spatial_tile_cache/) | Proximity Cache (Redis) | Accurate (Jaccard=0.9996) but `KEYS *` O(n) scan kills throughput; fix: use GEORADIUS |
+| [06](experiments/06_spatial_tile_cache/) | Proximity Cache (Redis GEOSEARCH) | cache-2km: 2.7× throughput (13,344 vs 4,954 req/s), Jaccard=0.9924 |
 | [07](experiments/07_bbox_filter_optimization/) | Bbox Filter Optimization | 4.4% large-batch, 368% small-batch gains with pre-filter |
 | [08](experiments/08_sql_functions/) | SQL Functions | SQL functions optimize batch queries with precompilation |
 | [09](experiments/09_jit_impact/) | JIT Impact | JIT has negligible impact (<3%) on I/O-bound spatial queries |
@@ -92,7 +92,10 @@ POST /exp/05/batch              # Serial LATERAL (reference)
 POST /exp/05/batch-json         # JSON expansion (recommended)
 POST /exp/05/batch-temp         # Temp table approach
 POST /exp/06/no-cache           # Baseline: direct PG query
-POST /exp/06/cache              # Redis point-keyed cache (lat/lon @ 4dp, TTL=3600s)
+POST /exp/06/cache-1km          # Redis GEOSEARCH proximity cache, 1km radius
+POST /exp/06/cache-2km          # Redis GEOSEARCH proximity cache, 2km radius
+POST /exp/06/cache-5km          # Redis GEOSEARCH proximity cache, 5km radius
+POST /exp/06/cache-10km         # Redis GEOSEARCH proximity cache, 10km radius
 POST /exp/07/batch              # Bbox pre-filter + ST_Covers
 POST /exp/08/lookup             # SQL functions for batch queries
 POST /exp/09/lookup             # JIT impact testing

@@ -20,12 +20,12 @@ export const options = {
   },
 };
 
-// Helper: generate random points (Spain bounds)
+// Helper: generate random points (France bounds)
 function randomPoints(count) {
-  const minLat = 36.0;
-  const maxLat = 43.8;
-  const minLon = -9.5;
-  const maxLon = 3.3;
+  const minLat = 43.238664;
+  const maxLat = 49.428801;
+  const minLon = -2.937207;
+  const maxLon = 7.016791;
 
   const points = [];
   for (let i = 0; i < count; i++) {

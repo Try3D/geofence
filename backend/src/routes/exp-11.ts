@@ -100,7 +100,7 @@ router.post(
   })
 );
 
-// NORMAL: Direct hierarchy_boundaries lookup (no CTE, no fallback)
+// NORMAL: hierarchy_boundaries lookup with planet_osm_polygon fallback for unmatched points
 router.post(
   "/normal",
   asyncHandler(async (req: Request, res: Response) => {
@@ -122,7 +122,7 @@ router.post(
           FROM points
         ),
         deepest_match AS (
-          SELECT 
+          SELECT
             pts.idx,
             hb.id,
             hb.osm_id,
@@ -133,7 +133,7 @@ router.post(
           FROM pts
           JOIN hierarchy_boundaries hb ON ST_Contains(hb.bounds, pts.g)
         )
-        SELECT 
+        SELECT
           idx,
           json_build_array(
             json_build_object(
@@ -167,6 +167,68 @@ router.post(
       result.rows.forEach((row) => {
         grouped[row.idx] = { idx: row.idx, hierarchy: row.hierarchy || [] };
       });
+
+      // Fallback: for unmatched points, query planet_osm_polygon
+      const unmatchedIndices = Object.keys(grouped)
+        .map(Number)
+        .filter((i) => grouped[i].hierarchy.length === 0);
+
+      if (unmatchedIndices.length > 0) {
+        const unmatchedLons = unmatchedIndices.map((i) => lons[i]);
+        const unmatchedLats = unmatchedIndices.map((i) => lats[i]);
+
+        const fallbackQuery = `
+          WITH points AS (
+            SELECT (ordinality - 1) AS idx, lon, lat
+            FROM unnest($1::float8[], $2::float8[]) WITH ORDINALITY AS t(lon, lat)
+          ),
+          pts AS (
+            SELECT idx, ST_Transform(ST_SetSRID(ST_Point(lon, lat), 4326), 3857) AS g
+            FROM points
+          ),
+          matches AS (
+            SELECT
+              pts.idx,
+              pop.osm_id,
+              pop.name,
+              pop.admin_level::int,
+              ROW_NUMBER() OVER (PARTITION BY pts.idx ORDER BY pop.admin_level::int DESC) as rn
+            FROM pts
+            JOIN planet_osm_polygon pop ON ST_Contains(pop.way, pts.g)
+            WHERE pop.admin_level IS NOT NULL
+              AND pop.admin_level::int IN (2, 4, 6, 8, 9, 10)
+          )
+          SELECT
+            idx,
+            json_build_array(
+              json_build_object(
+                'id', NULL,
+                'osm_id', osm_id,
+                'name', name,
+                'admin_level', admin_level,
+                'depth', 0
+              )
+            ) as hierarchy
+          FROM matches
+          WHERE rn = 1
+        `;
+
+        const fallbackResult = await pool.query<{
+          idx: number;
+          hierarchy: Array<{
+            id: null;
+            osm_id: number;
+            name: string;
+            admin_level: number;
+            depth: number;
+          }>;
+        }>(fallbackQuery, [unmatchedLons, unmatchedLats]);
+
+        fallbackResult.rows.forEach((row) => {
+          const originalIdx = unmatchedIndices[Number(row.idx)];
+          grouped[originalIdx] = { idx: originalIdx, hierarchy: row.hierarchy || [] };
+        });
+      }
 
       res.json({
         count: points.length,

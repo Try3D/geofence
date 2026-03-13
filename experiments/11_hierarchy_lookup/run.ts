@@ -2,12 +2,12 @@
 
 /**
  * Benchmarks hierarchical boundary lookups
- * 
- * Compares 4 approaches to administrative boundary matching:
+ *
+ * Compares 2 approaches:
  *   1. baseline: Full planet_osm_polygon scan (complete but slow)
  *   2. normal: Direct hierarchy_boundaries lookup (fast but incomplete)
- *   3. cte: Recursive CTE with full ancestor hierarchy
- *   4. cte-fallback: CTE with fallback to planet_osm_polygon for unmatched points
+ *
+ * 2 variants × 2 batch sizes = 4 experiments total
  */
 
 import path from "path";
@@ -25,187 +25,51 @@ const bench = new Benchmark({
   ...GEOFENCE_PRESETS,
 
   experiments: [
-    // ── Batch Size 10 ────────────────────────────────────────────────────────
+    // ── Single-point, 20 VUs ─────────────────────────────────────────────────
     {
-      label: "batch-10_baseline_vus=10",
-      vus: 10,
-      batchSize: 10,
-      duration: "60s",
+      label: "single_baseline_vus=20",
+      vus: 20,
+      batchSize: 1,
       extraEnv: {
         METHOD: "POST",
         TARGET_URL: `${BASE_URL}/exp/11/baseline`,
-        BODY: JSON.stringify({ points: randomPoints(10) }),
+        BODY: JSON.stringify({ points: randomPoints(1) }),
+        GENERATE_BODY: "true",
       },
     },
     {
-      label: "batch-10_normal_vus=10",
-      vus: 10,
-      batchSize: 10,
-      duration: "60s",
+      label: "single_normal_vus=20",
+      vus: 20,
+      batchSize: 1,
       extraEnv: {
         METHOD: "POST",
         TARGET_URL: `${BASE_URL}/exp/11/normal`,
-        BODY: JSON.stringify({ points: randomPoints(10) }),
-      },
-    },
-    {
-      label: "batch-10_cte_vus=10",
-      vus: 10,
-      batchSize: 10,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte`,
-        BODY: JSON.stringify({ points: randomPoints(10) }),
-      },
-    },
-    {
-      label: "batch-10_cte-fallback_vus=10",
-      vus: 10,
-      batchSize: 10,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte-fallback`,
-        BODY: JSON.stringify({ points: randomPoints(10) }),
+        BODY: JSON.stringify({ points: randomPoints(1) }),
+        GENERATE_BODY: "true",
       },
     },
 
-    // ── Batch Size 25 ────────────────────────────────────────────────────────
-    {
-      label: "batch-25_baseline_vus=10",
-      vus: 10,
-      batchSize: 25,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/baseline`,
-        BODY: JSON.stringify({ points: randomPoints(25) }),
-      },
-    },
-    {
-      label: "batch-25_normal_vus=10",
-      vus: 10,
-      batchSize: 25,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/normal`,
-        BODY: JSON.stringify({ points: randomPoints(25) }),
-      },
-    },
-    {
-      label: "batch-25_cte_vus=10",
-      vus: 10,
-      batchSize: 25,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte`,
-        BODY: JSON.stringify({ points: randomPoints(25) }),
-      },
-    },
-    {
-      label: "batch-25_cte-fallback_vus=10",
-      vus: 10,
-      batchSize: 25,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte-fallback`,
-        BODY: JSON.stringify({ points: randomPoints(25) }),
-      },
-    },
-
-    // ── Batch Size 50 ────────────────────────────────────────────────────────
-    {
-      label: "batch-50_baseline_vus=10",
-      vus: 10,
-      batchSize: 50,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/baseline`,
-        BODY: JSON.stringify({ points: randomPoints(50) }),
-      },
-    },
-    {
-      label: "batch-50_normal_vus=10",
-      vus: 10,
-      batchSize: 50,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/normal`,
-        BODY: JSON.stringify({ points: randomPoints(50) }),
-      },
-    },
-    {
-      label: "batch-50_cte_vus=10",
-      vus: 10,
-      batchSize: 50,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte`,
-        BODY: JSON.stringify({ points: randomPoints(50) }),
-      },
-    },
-    {
-      label: "batch-50_cte-fallback_vus=10",
-      vus: 10,
-      batchSize: 50,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte-fallback`,
-        BODY: JSON.stringify({ points: randomPoints(50) }),
-      },
-    },
-
-    // ── Batch Size 1000 (separate, heavy test) ────────────────────────────────
+    // ── Batch-1000, 10 VUs ───────────────────────────────────────────────────
     {
       label: "batch-1000_baseline_vus=10",
       vus: 10,
       batchSize: 1000,
-      duration: "60s",
       extraEnv: {
         METHOD: "POST",
         TARGET_URL: `${BASE_URL}/exp/11/baseline`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
+        GENERATE_BODY: "true",
       },
     },
     {
       label: "batch-1000_normal_vus=10",
       vus: 10,
       batchSize: 1000,
-      duration: "60s",
       extraEnv: {
         METHOD: "POST",
         TARGET_URL: `${BASE_URL}/exp/11/normal`,
         BODY: JSON.stringify({ points: randomPoints(1000) }),
-      },
-    },
-    {
-      label: "batch-1000_cte_vus=10",
-      vus: 10,
-      batchSize: 1000,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte`,
-        BODY: JSON.stringify({ points: randomPoints(1000) }),
-      },
-    },
-    {
-      label: "batch-1000_cte-fallback_vus=10",
-      vus: 10,
-      batchSize: 1000,
-      duration: "60s",
-      extraEnv: {
-        METHOD: "POST",
-        TARGET_URL: `${BASE_URL}/exp/11/cte-fallback`,
-        BODY: JSON.stringify({ points: randomPoints(1000) }),
+        GENERATE_BODY: "true",
       },
     },
   ],
