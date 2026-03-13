@@ -15,7 +15,7 @@ experiments that drove the production configuration.
 | [03](experiments/03_parallel_batch/) | Parallel Batch | Promise.all chunking: 2.48× over serial at vus=5 |
 | [04](experiments/04_geometry_simplification/) | Geometry Simplification | simple_10 (10 m): 2.48× speedup, IoU=0.9993 |
 | [05](experiments/05_batch_algorithms/) | Batch Algorithm Comparison | **JSON expansion is 3.8% faster than temp table; 26.4% faster than serial LATERAL** |
-| [06](experiments/06_spatial_tile_cache/) | Redis Point-Keyed Cache | Perfectly accurate but 21% slower—Redis overhead > gains on random data |
+| [06](experiments/06_spatial_tile_cache/) | Proximity Cache (Redis) | Accurate (Jaccard=0.9996) but `KEYS *` O(n) scan kills throughput; fix: use GEORADIUS |
 | [07](experiments/07_bbox_filter_optimization/) | Bbox Filter Optimization | 4.4% large-batch, 368% small-batch gains with pre-filter |
 | [08](experiments/08_sql_functions/) | SQL Functions | SQL functions optimize batch queries with precompilation |
 | [09](experiments/09_jit_impact/) | JIT Impact | JIT has negligible impact (<3%) on I/O-bound spatial queries |

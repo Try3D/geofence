@@ -1,214 +1,182 @@
 #!/usr/bin/env node
 
 /**
- * Accuracy testing for Redis point-keyed cache
+ * Accuracy testing for proximity cache variants
  *
- * Validates:
- * 1. Cache correctness: Jaccard similarity between cache and DB results
- * 2. Recall/precision on cache hits
- * 3. Redis memory usage and hit rate over time
+ * 10,000 points: 10 seeds × 1000 repeats each.
+ * Each point queried individually. Cache vs baseline fired concurrently
+ * with Promise.all per point.
  *
- * Protocol:
- * 1. Flush Redis
- * 2. Query 50 random points via both /cache and /no-cache
- * 3. Compare polygon ID sets (Jaccard, recall, precision)
- * 4. Report Redis memory usage via INFO
- * 5. Save results to accuracy.json
+ * Redis is NOT flushed — warm cache represents real-world scenario.
  */
 
 import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
-import { execSync } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE_URL = process.env.API_BASE_URL || "http://localhost:3000";
-const RESULTS_DIR = path.join(__dirname, "../../benchmark-results/06_spatial_tile_cache");
-
-interface TestPoint {
-  lat: number;
-  lon: number;
-}
+const RESULTS_DIR = path.join(
+  __dirname,
+  "../../benchmark-results/06_spatial_tile_cache"
+);
 
 interface AccuracyMetrics {
+  variant: string;
+  radiusM: number;
   totalPoints: number;
+  hitRate: string;
   avgJaccard: string;
   avgRecall: string;
   avgPrecision: string;
-  redisMemoryMB: string;
-  redisKeyCount: number;
+  avgCacheLatencyMs: string;
+  avgDbLatencyMs: string;
 }
 
-// Random points in Spain bounds
-function randomPointInSpain(): TestPoint {
-  const minLat = 36.0;
-  const maxLat = 43.8;
-  const minLon = -9.5;
-  const maxLon = 3.3;
+function randomPointInSpain() {
   return {
-    lat: minLat + Math.random() * (maxLat - minLat),
-    lon: minLon + Math.random() * (maxLon - minLon),
+    lat: 36.0 + Math.random() * (43.8 - 36.0),
+    lon: -9.5 + Math.random() * (3.3 - -9.5),
   };
 }
 
-// Compute Jaccard, recall, precision
-function computeSetMetrics(
-  cacheIds: Set<string>,
-  dbIds: Set<string>
-): {
-  jaccard: number;
-  recall: number;
-  precision: number;
-} {
+function computeSetMetrics(cacheIds: Set<string>, dbIds: Set<string>) {
   const intersection = new Set([...cacheIds].filter((x) => dbIds.has(x)));
   const union = new Set([...cacheIds, ...dbIds]);
+  return {
+    jaccard: union.size > 0 ? intersection.size / union.size : 1.0,
+    recall: dbIds.size > 0 ? intersection.size / dbIds.size : 1.0,
+    precision: cacheIds.size > 0 ? intersection.size / cacheIds.size : 1.0,
+  };
+}
 
-  const jaccard = union.size > 0 ? intersection.size / union.size : 1.0;
-  const recall = dbIds.size > 0 ? intersection.size / dbIds.size : 1.0;
-  const precision = cacheIds.size > 0 ? intersection.size / cacheIds.size : 1.0;
+async function queryPoint(endpoint: string, lat: number, lon: number) {
+  const resp = await fetch(`${BASE_URL}${endpoint}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ lat, lon, table: "planet_osm_polygon" }),
+  });
+  if (!resp.ok) throw new Error(`${endpoint} returned ${resp.status}`);
+  return resp.json() as Promise<any>;
+}
 
-  return { jaccard, recall, precision };
+async function testVariant(
+  endpoint: string,
+  radiusM: number,
+  testPoints: Array<{ lat: number; lon: number }>
+): Promise<AccuracyMetrics> {
+  console.log(`  Testing ${endpoint} (${radiusM / 1000}km, ${testPoints.length} points)...`);
+
+  let hitCount = 0;
+  let missCount = 0;
+  let totalJaccard = 0;
+  let totalRecall = 0;
+  let totalPrecision = 0;
+  let totalCacheLatency = 0;
+  let totalDbLatency = 0;
+  let skipped = 0;
+
+  for (const pt of testPoints) {
+    try {
+      // Fire cache and baseline concurrently for each point
+      const [cacheData, dbData] = await Promise.all([
+        queryPoint(endpoint, pt.lat, pt.lon),
+        queryPoint("/exp/06/no-cache", pt.lat, pt.lon),
+      ]);
+
+      const cacheIds = new Set<string>(cacheData.polygonIds);
+      const dbIds = new Set<string>(dbData.polygonIds);
+      const latency = parseFloat(cacheData.latencyMs || "0");
+
+      if (cacheData.source === "cache") {
+        hitCount++;
+        totalCacheLatency += latency;
+      } else {
+        missCount++;
+        totalDbLatency += latency;
+      }
+
+      const m = computeSetMetrics(cacheIds, dbIds);
+      totalJaccard += m.jaccard;
+      totalRecall += m.recall;
+      totalPrecision += m.precision;
+    } catch {
+      skipped++;
+    }
+  }
+
+  const total = hitCount + missCount;
+  if (skipped > 0) console.log(`    (${skipped} points skipped due to errors)`);
+
+  return {
+    variant: endpoint.replace("/exp/06/", ""),
+    radiusM,
+    totalPoints: total,
+    hitRate: total > 0 ? ((hitCount / total) * 100).toFixed(2) : "0.00",
+    avgJaccard: total > 0 ? (totalJaccard / total).toFixed(4) : "N/A",
+    avgRecall: total > 0 ? ((totalRecall / total) * 100).toFixed(1) : "N/A",
+    avgPrecision: total > 0 ? ((totalPrecision / total) * 100).toFixed(1) : "N/A",
+    avgCacheLatencyMs: hitCount > 0 ? (totalCacheLatency / hitCount).toFixed(2) : "0.00",
+    avgDbLatencyMs: missCount > 0 ? (totalDbLatency / missCount).toFixed(2) : "0.00",
+  };
 }
 
 async function main() {
   console.log("═".repeat(80));
-  console.log("REDIS CACHE — ACCURACY & CORRECTNESS");
+  console.log("PROXIMITY CACHE — ACCURACY TEST (10,000 POINTS, WARM REDIS)");
   console.log("═".repeat(80));
-  console.log(`Backend: ${BASE_URL}\n`);
+  console.log(`Backend: ${BASE_URL}`);
+  console.log("Note: Redis NOT flushed — warm cache\n");
 
-  try {
-    // 1. Flush Redis via redis-cli
-    console.log("Flushing Redis...");
-    try {
-      execSync("redis-cli flushdb", { stdio: "pipe" });
-    } catch (e) {
-      console.warn("Could not flush Redis via redis-cli, continuing...");
-    }
-    console.log("✓ Redis flushed\n");
+  // 10,000 unique random points
+  const testPoints = Array.from({ length: 10000 }, () => randomPointInSpain());
+  console.log(`Generated ${testPoints.length} unique random points\n`);
 
-    // 2. Generate 50 random test points
-    const TEST_POINTS = 50;
-    console.log(`Querying ${TEST_POINTS} random points...\n`);
+  const results: AccuracyMetrics[] = [];
+  results.push(await testVariant("/exp/06/cache-1km", 1000, testPoints));
+  results.push(await testVariant("/exp/06/cache-2km", 2000, testPoints));
+  results.push(await testVariant("/exp/06/cache-5km", 5000, testPoints));
+  results.push(await testVariant("/exp/06/cache-10km", 10000, testPoints));
 
-    let totalJaccard = 0;
-    let totalRecall = 0;
-    let totalPrecision = 0;
-    let pointsCompared = 0;
+  console.log("\n" + "═".repeat(80));
+  console.log("RESULTS");
+  console.log("═".repeat(80) + "\n");
 
-    for (let i = 0; i < TEST_POINTS; i++) {
-      const testPoint = randomPointInSpain();
+  const h =
+    "Variant".padEnd(14) +
+    "Radius".padEnd(8) +
+    "Hit Rate".padEnd(11) +
+    "Jaccard".padEnd(10) +
+    "Recall".padEnd(9) +
+    "Precision".padEnd(12) +
+    "Cache Lat".padEnd(12) +
+    "DB Lat";
+  console.log(h);
+  console.log("-".repeat(h.length));
 
-      // Query /cache (Redis)
-      const cacheResp = await fetch(`${BASE_URL}/exp/06/cache`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          points: [{ lat: testPoint.lat, lon: testPoint.lon }],
-          table: "planet_osm_polygon",
-        }),
-      });
-
-      if (!cacheResp.ok) {
-        console.error(`Cache query failed for point ${i}`);
-        continue;
-      }
-
-      const cacheData = (await cacheResp.json()) as any;
-      const cacheResult = cacheData.results[0];
-      const cacheIds = new Set(cacheResult.polygonIds);
-
-      // Query /no-cache (DB baseline)
-      const dbResp = await fetch(`${BASE_URL}/exp/06/no-cache`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          points: [{ lat: testPoint.lat, lon: testPoint.lon }],
-          table: "planet_osm_polygon",
-        }),
-      });
-
-      if (!dbResp.ok) {
-        console.error(`DB query failed for point ${i}`);
-        continue;
-      }
-
-      const dbData = (await dbResp.json()) as any;
-      const dbResult = dbData.results[0];
-      const dbIds = new Set(dbResult.polygonIds);
-
-      // Compute metrics
-      const metrics = computeSetMetrics(cacheIds, dbIds);
-      totalJaccard += metrics.jaccard;
-      totalRecall += metrics.recall;
-      totalPrecision += metrics.precision;
-      pointsCompared++;
-    }
-
-    // 3. Get Redis memory usage via redis-cli
-    let redisMemory = "unknown";
-    let keyCount = 0;
-
-    try {
-      const info = execSync("redis-cli info memory", { encoding: "utf-8" });
-      const memoryMatch = info.match(/used_memory_human:(.+?)\r/);
-      redisMemory = memoryMatch ? memoryMatch[1].trim() : "unknown";
-
-      const dbsizeStr = execSync("redis-cli dbsize", { encoding: "utf-8" });
-      const keysMatch = dbsizeStr.match(/\d+/);
-      keyCount = keysMatch ? parseInt(keysMatch[0]) : 0;
-    } catch (e) {
-      console.warn("Could not get Redis info, continuing with defaults...");
-    }
-
-    // 4. Compute averages
-    const avgJaccard =
-      pointsCompared > 0
-        ? (totalJaccard / pointsCompared).toFixed(3)
-        : "N/A";
-    const avgRecall =
-      pointsCompared > 0
-        ? ((totalRecall / pointsCompared) * 100).toFixed(1)
-        : "N/A";
-    const avgPrecision =
-      pointsCompared > 0
-        ? ((totalPrecision / pointsCompared) * 100).toFixed(1)
-        : "N/A";
-
-    // 5. Print results
-    console.log("═".repeat(80));
-    console.log("RESULTS");
-    console.log("═".repeat(80) + "\n");
-
-    console.log(`Points tested:          ${pointsCompared}`);
-    console.log(`Avg Jaccard similarity: ${avgJaccard}`);
-    console.log(`Avg Recall:             ${avgRecall}%`);
-    console.log(`Avg Precision:          ${avgPrecision}%`);
-    console.log(`Redis memory used:      ${redisMemory}`);
-    console.log(`Redis key count:        ${keyCount}\n`);
-
-    // 6. Save results
-    fs.mkdirSync(RESULTS_DIR, { recursive: true });
-    const output: AccuracyMetrics = {
-      totalPoints: pointsCompared,
-      avgJaccard: avgJaccard as string,
-      avgRecall: avgRecall as string,
-      avgPrecision: avgPrecision as string,
-      redisMemoryMB: redisMemory,
-      redisKeyCount: keyCount,
-    };
-
-    fs.writeFileSync(
-      path.join(RESULTS_DIR, "accuracy.json"),
-      JSON.stringify(output, null, 2)
-    );
-
+  for (const r of results) {
     console.log(
-      `✓ Results saved to benchmark-results/06_spatial_tile_cache/accuracy.json\n`
+      r.variant.padEnd(14) +
+        `${r.radiusM / 1000}km`.padEnd(8) +
+        `${r.hitRate}%`.padEnd(11) +
+        r.avgJaccard.padEnd(10) +
+        `${r.avgRecall}%`.padEnd(9) +
+        `${r.avgPrecision}%`.padEnd(12) +
+        `${r.avgCacheLatencyMs}ms`.padEnd(12) +
+        `${r.avgDbLatencyMs}ms`
     );
-  } catch (error) {
-    console.error("Error:", error instanceof Error ? error.message : error);
-    process.exit(1);
   }
+
+  console.log();
+  fs.mkdirSync(RESULTS_DIR, { recursive: true });
+  fs.writeFileSync(
+    path.join(RESULTS_DIR, "accuracy.json"),
+    JSON.stringify(results, null, 2)
+  );
+  console.log("✓ Saved to benchmark-results/06_spatial_tile_cache/accuracy.json\n");
 }
 
-main();
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

@@ -42,11 +42,18 @@ export default function () {
   let body = staticBody;
 
   if (method === "POST") {
-    // If GENERATE_BODY flag is set, regenerate points for each iteration
-    if (generateBody && staticBody && staticBody.includes('"points":')) {
-      const newPoints = randomPoints(batchSize);
+    // If GENERATE_BODY flag is set, regenerate body per iteration
+    if (generateBody && staticBody) {
       const baseBody = JSON.parse(staticBody);
-      baseBody.points = newPoints;
+      if (staticBody.includes('"points":')) {
+        // Batch: regenerate points array
+        baseBody.points = randomPoints(batchSize);
+      } else {
+        // Single-point: regenerate lat/lon
+        const [p] = randomPoints(1);
+        baseBody.lat = p.lat;
+        baseBody.lon = p.lon;
+      }
       body = JSON.stringify(baseBody);
     }
 
