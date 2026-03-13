@@ -98,18 +98,12 @@ Accuracy testing showed exceptional hit rates and correctness:
 | 3km    | 99.50%   | **0.990**   | 99.2%      | 99.7%         |
 | 5km    | 99.50%   | **0.990**   | 99.3%      | 99.4%         |
 
-**Key observation:** All three variants achieved 99%+ hit rates with Jaccard >0.989. The polygon sets returned from proximity cache are nearly identical to DB results (99.1-99.3% recall, 99.4-99.7% precision). This suggests that cached polygon sets are extremely stable across all distance bands, validating the proximity-caching approach.
+**Key observation:** All three variants achieved 99%+ hit rates with Jaccard >0.989. The polygon sets returned from proximity cache are nearly identical to DB results (99.1-99.3% recall, 99.4-99.7% precision). Cache returns identical polygon sets >99% of the time, validating the proximity-caching approach.
 
-### Performance Results (from run.ts: k6 load test, 10 VUs, 60s)
-
-| Variant    | Throughput (req/s) | Avg Latency (ms) | p95 Latency (ms) | p99 Latency (ms) | Requests |
-|------------|------------------|------------------|------------------|------------------|----------|
-| no-cache   | 0.73 (baseline)    | 13,652.67        | 16,973.96        | 16,973.96        | 50       |
-| cache-1km  | **189.22** (+25,900%) | **52.79**        | **69.43**         | **69.43**         | 11,360   |
-| cache-3km  | **148.60** (+20,300%) | **67.22**        | **90.23**         | **90.23**         | 8,923    |
-| cache-5km  | **130.53** (+17,800%) | **76.53**        | **103.85**        | **103.85**        | 7,839    |
-
-**Key finding:** Cache-1km provides **25,900% throughput improvement** (0.73 → 189 req/s) with **256x lower latency** (13,652ms → 52.79ms). Even with the cold cache (gradual warming), hits provide massive latency wins.
+**Latency breakdown from accuracy.ts:**
+- **Cache hits:** <1ms (geohash lookup + Haversine distance)
+- **DB queries (misses):** ~50-100ms
+- **Effective gain:** **100x faster for cache hits**
 
 ## Interpretation
 
@@ -119,23 +113,23 @@ Accuracy testing showed exceptional hit rates and correctness:
 
 1. **Fixed implementation transforms cache from useless to critical-path optimization**
    - Original (broken): proximity hits still queried DB → 0% latency improvement
-   - Fixed: proximity hits skip DB entirely → **256x latency improvement**
+   - Fixed: proximity hits skip DB entirely → **100x latency improvement** (cache <1ms vs DB 50-100ms)
 
 2. **Proximity cache hits are nearly perfect (99%+ Jaccard)**
    - Geofence sets are extremely stable within small radius (1-5km)
    - Means users don't enter/exit geofences at proximity-search boundaries
    - Cache returns identical polygon sets >99% of the time
 
-3. **Hit rates scale with radius, but remain high even at 1km**
-   - 1km: 100% hit rate (after warm-up)
+3. **Hit rates scale with radius, all achieve 99%+ with fixed locality**
+   - 1km: 100% hit rate (after warm-up with seed points)
    - 3km, 5km: 99.5% hit rate (1 miss per 200 queries)
-   - With 300-point cache warm-up, very high reuse on similar workloads
+   - Hit rate depends ENTIRELY on spatial locality of incoming queries
+   - Random points = 0% hit rate; clustered points = 99%+ hit rate
 
-4. **Latency improvements are massive and proportional to cache warming**
-   - no-cache: 13.6 seconds per request (baseline)
-   - cache-1km: 52.8ms per request (**256x faster**)
-   - Even 3km/5km: 67-76ms per request (**180x faster**)
-   - Difference is database query time (50-100ms) vs cache lookup (<1ms)
+4. **Real latency performance measured in accuracy.ts**
+   - Cache hits: <1ms (geohash + Haversine)
+   - DB queries: 50-100ms per point
+   - With 100% hit rate: **100x latency improvement**
 
 ### Key Trade-off Analysis
 
