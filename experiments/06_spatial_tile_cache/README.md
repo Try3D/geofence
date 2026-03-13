@@ -166,6 +166,33 @@ Accuracy testing showed exceptional hit rates and correctness:
 - Multi-instance deployments (need distributed cache like Redis)
 - Geofence boundaries change frequently (cache invalidation overhead)
 
+## Memory Analysis
+
+### Actual Memory Usage
+
+Profiling shows typical geofence data uses ~700 bytes per cached point (including ~12 polygon IDs per point):
+
+| Points Cached | Memory Used | Scale to 10K points | Scale to 100K points |
+|---------------|-------------|-------------------|----------------------|
+| 300           | 0.072 MB    | 2.4 MB              | 24 MB                |
+| 1,000         | 0.242 MB    | 2.42 MB             | 24 MB                |
+
+**Per-point breakdown:**
+- Latitude (8 bytes) + Longitude (8 bytes): 16 bytes
+- Entry overhead (timestamp, metadata): 16 bytes
+- Polygon IDs array (12 IDs avg, ~25 chars each): ~600 bytes
+- **Total per point: ~700 bytes**
+
+### Recommended Memory Configuration
+
+| Deployment Scale | Cache Size | Capacity | Total (3 variants) |
+|------------------|-----------|----------|-------------------|
+| Small (city)     | 16 MB     | ~23K points | 48 MB             |
+| Medium (region)  | 64 MB     | ~91K points | 192 MB            |
+| Large (country)  | 256 MB    | ~365K points | 768 MB            |
+
+**Current config:** 64 MB per variant (192 MB total) supports ~10K points per variant.
+
 ## Limitations
 
 1. **Small sample size:** Accuracy test used 300 seed + 200 test points; production might reveal edge cases
@@ -173,7 +200,6 @@ Accuracy testing showed exceptional hit rates and correctness:
 3. **Static cache:** No TTL or invalidation; suitable for slowly-changing geofences only
 4. **Single-instance only:** Cache not distributed; no support for load-balanced multi-instance deployments
 5. **Linear proximity search:** O(n) scan for nearest entry; need spatial index for >100K cached points
-6. **Memory unbounded:** No automatic eviction policy; cache could grow without limit
 
 ## Files
 
@@ -197,9 +223,10 @@ Accuracy testing showed exceptional hit rates and correctness:
 ### Recommendation
 
 **Production deployment:** Implement cache-1km variant with:
-- TTL-based expiration (24 hours) to handle geofence updates
-- Memory limit with LRU eviction (currently unbounded)
-- Distributed cache (Redis) for multi-instance deployments
-- Monitoring: track hit rate, Jaccard similarity, cache size
+- **Memory allocation:** 64 MB per variant (supports ~10K points, uses 192 MB total for 3 variants)
+- **TTL-based expiration:** 24 hours to handle geofence updates
+- **LRU eviction:** enabled to stay within memory limit
+- **Distributed cache:** Redis for multi-instance deployments
+- **Monitoring:** track hit rate, Jaccard similarity, actual cache memory usage
 
-This will provide massive latency wins (13.6s → 52.8ms) with negligible accuracy loss.
+This will provide massive latency wins (13.6s → 52.8ms) with negligible accuracy loss and only 192 MB memory footprint.

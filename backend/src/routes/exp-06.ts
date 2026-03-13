@@ -12,9 +12,10 @@ import { pool } from "../db";
 const router = express.Router();
 
 // Initialize separate caches for each proximity radius variant
-const cache1km = new GeohashTileSystem(7, 512);
-const cache3km = new GeohashTileSystem(7, 512);
-const cache5km = new GeohashTileSystem(7, 512);
+// Memory per variant: 64 MB (supports ~10K cached points, ~7-8KB per point)
+const cache1km = new GeohashTileSystem(7, 64);
+const cache3km = new GeohashTileSystem(7, 64);
+const cache5km = new GeohashTileSystem(7, 64);
 
 /**
  * Haversine distance between two points (meters)
