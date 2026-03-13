@@ -16,6 +16,7 @@ import exp08Routes from "./routes/exp-08";
 import exp09Routes from "./routes/exp-09";
 import exp10Routes from "./routes/exp-10";
 import exp11Routes from "./routes/exp-11";
+import exp12Routes from "./routes/exp-12";
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -34,6 +35,7 @@ app.use("/exp/08", exp08Routes);
 app.use("/exp/09", exp09Routes);
 app.use("/exp/10", exp10Routes);
 app.use("/exp/11", exp11Routes);
+app.use("/exp/12", exp12Routes);
 
 // Error handler
 app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
