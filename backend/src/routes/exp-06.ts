@@ -1,4 +1,5 @@
 import express, { Request, Response } from "express";
+import Redis from "ioredis";
 import { asyncHandler } from "../utils/errorHandler";
 import { formatError } from "../utils/errorHandler";
 import {
@@ -6,114 +7,22 @@ import {
   parseCoordinates,
   parseTable,
 } from "../utils/validators";
-import { GeohashTileSystem } from "../utils/tile-cache";
 import { pool } from "../db";
 
 const router = express.Router();
 
-// Initialize separate caches for each proximity radius variant
-// Memory per variant: 64 MB (supports ~10K cached points, ~7-8KB per point)
-const cache1km = new GeohashTileSystem(7, 64);
-const cache3km = new GeohashTileSystem(7, 64);
-const cache5km = new GeohashTileSystem(7, 64);
+// Initialize Redis client
+const redis = new Redis({ host: "localhost", port: 6379 });
 
 /**
- * Haversine distance between two points (meters)
+ * Cache key: lat/lon rounded to 4 decimal places (~11m grid)
  */
-function haversineDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371000; // Earth radius in meters
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
+function cacheKey(lat: number, lon: number): string {
+  return `geofence:${lat.toFixed(4)}:${lon.toFixed(4)}`;
 }
 
 /**
- * Process a single point: try exact cache hit, proximity hit, then DB query
- * Key fix: proximity hits skip the DB query entirely
- */
-async function processPoint(
-  cache: GeohashTileSystem,
-  maxDistM: number,
-  table: string,
-  lat: number,
-  lon: number,
-  idx: number
-): Promise<{
-  idx: number;
-  polygonIds: string[];
-  source: "cache-exact" | "cache-proximity" | "db";
-  distanceM?: number;
-  cacheHitLatencyMs?: number;
-  dbQueryLatencyMs?: number;
-}> {
-  const t0 = performance.now();
-
-  // Try exact tile match
-  const exact = cache.get(lat, lon);
-  if (exact.hit && exact.entry) {
-    const hitLatency = performance.now() - t0;
-    return {
-      idx,
-      polygonIds: exact.entry.polygonIds,
-      source: "cache-exact",
-      distanceM: 0,
-      cacheHitLatencyMs: hitLatency,
-    };
-  }
-
-  // Try proximity match (this is the key fix: no DB query on proximity hit)
-  const prox = cache.getProximity(lat, lon, maxDistM);
-  if (prox.hit && prox.entry) {
-    const hitLatency = performance.now() - t0;
-    return {
-      idx,
-      polygonIds: prox.entry.polygonIds,
-      source: "cache-proximity",
-      distanceM: Math.round(
-        haversineDistance(lat, lon, prox.entry.lat, prox.entry.lon)
-      ),
-      cacheHitLatencyMs: hitLatency,
-    };
-  }
-
-  // Full miss: query DB and store in cache
-  const dbT0 = performance.now();
-  const dbResult = await pool.query(
-    `SELECT DISTINCT p.osm_id::text
-     FROM ${table} p
-     WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
-     LIMIT 1000`,
-    [lon, lat]
-  );
-  const dbQueryLatency = performance.now() - dbT0;
-  const totalLatency = performance.now() - t0;
-
-  const polygonIds = dbResult.rows.map((r: any) => r.osm_id);
-  cache.set(lat, lon, polygonIds);
-
-  return {
-    idx,
-    polygonIds,
-    source: "db",
-    dbQueryLatencyMs: dbQueryLatency,
-    cacheHitLatencyMs: totalLatency,
-  };
-}
-
-/**
- * Baseline: no cache, direct DB query
+ * POST /exp/06/no-cache — Baseline: direct DB query
  */
 router.post(
   "/no-cache",
@@ -152,7 +61,7 @@ router.post(
           idx: i,
           polygonIds: dbResult.rows.map((r: any) => r.osm_id),
           source: "db",
-          dbQueryLatencyMs: latency,
+          dbQueryLatencyMs: latency.toFixed(2),
         });
       }
 
@@ -177,10 +86,10 @@ router.post(
 );
 
 /**
- * Cache with 1km proximity radius
+ * POST /exp/06/cache — Redis key-value cache with TTL
  */
 router.post(
-  "/cache-1km",
+  "/cache",
   asyncHandler(async (req: Request, res: Response) => {
     try {
       const { points, table: tableRaw } = req.body as {
@@ -202,24 +111,61 @@ router.post(
         const lat = lats[i];
         const lon = lons[i];
 
-        const result = await processPoint(cache1km, 1000, table, lat, lon, i);
-        results.push(result);
+        const t0 = performance.now();
+        const key = cacheKey(lat, lon);
 
-        if (result.source !== "db") {
+        // Try Redis cache
+        const cached = await redis.get(key);
+        const hitLatency = performance.now() - t0;
+
+        if (cached) {
+          // Cache hit
           hitCount++;
-          if (result.cacheHitLatencyMs) {
-            totalCacheHitLatency += result.cacheHitLatencyMs;
-          }
+          totalCacheHitLatency += hitLatency;
+
+          results.push({
+            idx: i,
+            polygonIds: JSON.parse(cached),
+            source: "cache",
+            cacheHitLatencyMs: hitLatency.toFixed(2),
+          });
         } else {
+          // Cache miss: query DB
+          const dbT0 = performance.now();
+          const dbResult = await pool.query(
+            `SELECT DISTINCT p.osm_id::text
+             FROM ${table} p
+             WHERE ST_Covers(p.way, ST_Transform(ST_SetSRID(ST_Point($1, $2), 4326), 3857))
+             LIMIT 1000`,
+            [lon, lat]
+          );
+          const dbQueryLatency = performance.now() - dbT0;
+          totalDbLatency += dbQueryLatency;
+
+          const polygonIds = dbResult.rows.map((r: any) => r.osm_id);
+
+          // Store in Redis with 3600s TTL
+          await redis.setex(
+            key,
+            3600,
+            JSON.stringify(polygonIds)
+          );
+
           missCount++;
-          if (result.dbQueryLatencyMs) {
-            totalDbLatency += result.dbQueryLatencyMs;
-          }
+
+          results.push({
+            idx: i,
+            polygonIds,
+            source: "db",
+            dbQueryLatencyMs: dbQueryLatency.toFixed(2),
+            cacheHitLatencyMs: hitLatency.toFixed(2),
+          });
         }
       }
 
+      const totalHits = hitCount + missCount;
       const hitRate =
-        ((hitCount / (hitCount + missCount)) * 100).toFixed(2);
+        totalHits > 0 ? ((hitCount / totalHits) * 100).toFixed(2) : "0.00";
 
       res.json({
         count: points.length,
@@ -229,9 +175,13 @@ router.post(
           misses: missCount,
           hitRate: `${hitRate}%`,
           avgCacheHitLatencyMs:
-            hitCount > 0 ? (totalCacheHitLatency / hitCount).toFixed(2) : 0,
+            hitCount > 0
+              ? (totalCacheHitLatency / hitCount).toFixed(2)
+              : 0,
           avgDbQueryLatencyMs:
-            missCount > 0 ? (totalDbLatency / missCount).toFixed(2) : 0,
+            missCount > 0
+              ? (totalDbLatency / missCount).toFixed(2)
+              : 0,
           totalLatencyMs: (totalCacheHitLatency + totalDbLatency).toFixed(2),
         },
       });
@@ -241,147 +191,5 @@ router.post(
     }
   })
 );
-
-/**
- * Cache with 3km proximity radius
- */
-router.post(
-  "/cache-3km",
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const { points, table: tableRaw } = req.body as {
-        points: unknown;
-        table?: unknown;
-      };
-
-      validateBatchPayload(points);
-      const { lons, lats } = parseCoordinates(points);
-      const table = parseTable(tableRaw);
-
-      const results = [];
-      let hitCount = 0;
-      let missCount = 0;
-      let totalCacheHitLatency = 0;
-      let totalDbLatency = 0;
-
-      for (let i = 0; i < points.length; i++) {
-        const lat = lats[i];
-        const lon = lons[i];
-
-        const result = await processPoint(cache3km, 3000, table, lat, lon, i);
-        results.push(result);
-
-        if (result.source !== "db") {
-          hitCount++;
-          if (result.cacheHitLatencyMs) {
-            totalCacheHitLatency += result.cacheHitLatencyMs;
-          }
-        } else {
-          missCount++;
-          if (result.dbQueryLatencyMs) {
-            totalDbLatency += result.dbQueryLatencyMs;
-          }
-        }
-      }
-
-      const hitRate =
-        ((hitCount / (hitCount + missCount)) * 100).toFixed(2);
-
-      res.json({
-        count: points.length,
-        results,
-        cacheStats: {
-          hits: hitCount,
-          misses: missCount,
-          hitRate: `${hitRate}%`,
-          avgCacheHitLatencyMs:
-            hitCount > 0 ? (totalCacheHitLatency / hitCount).toFixed(2) : 0,
-          avgDbQueryLatencyMs:
-            missCount > 0 ? (totalDbLatency / missCount).toFixed(2) : 0,
-          totalLatencyMs: (totalCacheHitLatency + totalDbLatency).toFixed(2),
-        },
-      });
-    } catch (error) {
-      const message = formatError(error);
-      res.status(400).json({ error: message });
-    }
-  })
-);
-
-/**
- * Cache with 5km proximity radius
- */
-router.post(
-  "/cache-5km",
-  asyncHandler(async (req: Request, res: Response) => {
-    try {
-      const { points, table: tableRaw } = req.body as {
-        points: unknown;
-        table?: unknown;
-      };
-
-      validateBatchPayload(points);
-      const { lons, lats } = parseCoordinates(points);
-      const table = parseTable(tableRaw);
-
-      const results = [];
-      let hitCount = 0;
-      let missCount = 0;
-      let totalCacheHitLatency = 0;
-      let totalDbLatency = 0;
-
-      for (let i = 0; i < points.length; i++) {
-        const lat = lats[i];
-        const lon = lons[i];
-
-        const result = await processPoint(cache5km, 5000, table, lat, lon, i);
-        results.push(result);
-
-        if (result.source !== "db") {
-          hitCount++;
-          if (result.cacheHitLatencyMs) {
-            totalCacheHitLatency += result.cacheHitLatencyMs;
-          }
-        } else {
-          missCount++;
-          if (result.dbQueryLatencyMs) {
-            totalDbLatency += result.dbQueryLatencyMs;
-          }
-        }
-      }
-
-      const hitRate =
-        ((hitCount / (hitCount + missCount)) * 100).toFixed(2);
-
-      res.json({
-        count: points.length,
-        results,
-        cacheStats: {
-          hits: hitCount,
-          misses: missCount,
-          hitRate: `${hitRate}%`,
-          avgCacheHitLatencyMs:
-            hitCount > 0 ? (totalCacheHitLatency / hitCount).toFixed(2) : 0,
-          avgDbQueryLatencyMs:
-            missCount > 0 ? (totalDbLatency / missCount).toFixed(2) : 0,
-          totalLatencyMs: (totalCacheHitLatency + totalDbLatency).toFixed(2),
-        },
-      });
-    } catch (error) {
-      const message = formatError(error);
-      res.status(400).json({ error: message });
-    }
-  })
-);
-
-/**
- * Clear all caches
- */
-router.post("/clear-cache", (_req: Request, res: Response) => {
-  cache1km.clear();
-  cache3km.clear();
-  cache5km.clear();
-  res.json({ ok: true, message: "All caches cleared" });
-});
 
 export default router;
