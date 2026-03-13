@@ -52,17 +52,18 @@ npx tsx experiments/06_spatial_tile_cache/run.ts
 
 ### Combined Results (accuracy + k6 benchmark)
 
-10,000 unique random points for accuracy; k6: 10 VUs, 60s, fresh random point per iteration.
+Accuracy: 10,000 unique random points, cold Redis per variant, empty-polygon points excluded (9,078/10,000 points were outside all polygons and skipped — only the 922 points that actually matched polygons are scored).
+k6: 10 VUs, 60s, fresh random point per iteration.
 
 | Variant | Radius | Hit Rate | Jaccard | Recall | Precision | Throughput (req/s) | Avg Lat (ms) | P95 Lat (ms) |
 |---------|--------|----------|---------|--------|-----------|-------------------|--------------|--------------|
 | no-cache | — | — | — | — | — | **4,949** | 1.97 | 9.25 |
-| cache-1km | 1km | 10.27% | 0.9996 | 100.0% | 100.0% | 335 | 29.76 | 58.96 |
-| cache-2km | 2km | 100.00% | 0.9996 | 100.0% | 100.0% | 146 | 68.50 | 93.91 |
-| cache-5km | 5km | 100.00% | 0.9996 | 100.0% | 100.0% | 126 | 79.23 | 99.48 |
-| cache-10km | 10km | 100.00% | 0.9996 | 100.0% | 100.0% | 130 | 76.65 | 105.17 |
+| cache-1km | 1km | 2.17% | 0.9977 | 99.9% | 99.9% | 335 | 29.76 | 58.96 |
+| cache-2km | 2km | 7.05% | 0.9933 | 99.6% | 99.6% | 146 | 68.50 | 93.91 |
+| cache-5km | 5km | 30.95% | 0.9428 | 96.2% | 96.2% | 126 | 79.23 | 99.48 |
+| cache-10km | 10km | 66.17% | 0.8168 | 86.8% | 86.9% | 130 | 76.65 | 105.17 |
 
-**Accuracy is near-perfect (Jaccard=0.9996)** — cached results match DB with 100% recall and precision. The small Jaccard gap is from a handful of boundary cases.
+**Clear accuracy/hit-rate tradeoff:** larger radius = more hits but wrong polygons. At 10km, 13% of returned polygon sets are wrong. At 1–2km, accuracy is near-perfect but hit rate is very low on random data.
 
 ## Analysis
 

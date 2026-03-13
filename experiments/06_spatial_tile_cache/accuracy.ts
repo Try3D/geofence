@@ -44,9 +44,9 @@ function computeSetMetrics(cacheIds: Set<string>, dbIds: Set<string>) {
   const intersection = new Set([...cacheIds].filter((x) => dbIds.has(x)));
   const union = new Set([...cacheIds, ...dbIds]);
   return {
-    jaccard: union.size > 0 ? intersection.size / union.size : 1.0,
-    recall: dbIds.size > 0 ? intersection.size / dbIds.size : 1.0,
-    precision: cacheIds.size > 0 ? intersection.size / cacheIds.size : 1.0,
+    jaccard: union.size > 0 ? intersection.size / union.size : null,
+    recall: dbIds.size > 0 ? intersection.size / dbIds.size : null,
+    precision: cacheIds.size > 0 ? intersection.size / cacheIds.size : null,
   };
 }
 
@@ -60,12 +60,18 @@ async function queryPoint(endpoint: string, lat: number, lon: number) {
   return resp.json() as Promise<any>;
 }
 
+async function flushRedis() {
+  await fetch(`${BASE_URL}/exp/06/flush`, { method: "POST" });
+}
+
 async function testVariant(
   endpoint: string,
   radiusM: number,
   testPoints: Array<{ lat: number; lon: number }>
 ): Promise<AccuracyMetrics> {
-  console.log(`  Testing ${endpoint} (${radiusM / 1000}km, ${testPoints.length} points)...`);
+  // Flush Redis before each variant so each starts from a cold cache
+  await flushRedis();
+  console.log(`  Testing ${endpoint} (${radiusM / 1000}km, ${testPoints.length} points, cold cache)...`);
 
   let hitCount = 0;
   let missCount = 0;
@@ -86,6 +92,13 @@ async function testVariant(
 
       const cacheIds = new Set<string>(cacheData.polygonIds);
       const dbIds = new Set<string>(dbData.polygonIds);
+
+      // Skip points where both sets are empty — outside all polygons, proves nothing
+      if (cacheIds.size === 0 && dbIds.size === 0) {
+        skipped++;
+        continue;
+      }
+
       const latency = parseFloat(cacheData.latencyMs || "0");
 
       if (cacheData.source === "cache") {
@@ -97,16 +110,16 @@ async function testVariant(
       }
 
       const m = computeSetMetrics(cacheIds, dbIds);
-      totalJaccard += m.jaccard;
-      totalRecall += m.recall;
-      totalPrecision += m.precision;
+      if (m.jaccard !== null) totalJaccard += m.jaccard;
+      if (m.recall !== null) totalRecall += m.recall;
+      if (m.precision !== null) totalPrecision += m.precision;
     } catch {
       skipped++;
     }
   }
 
   const total = hitCount + missCount;
-  if (skipped > 0) console.log(`    (${skipped} points skipped due to errors)`);
+  console.log(`    → ${hitCount} hits, ${missCount} misses, ${skipped} skipped (both sets empty)`);
 
   return {
     variant: endpoint.replace("/exp/06/", ""),
@@ -126,7 +139,8 @@ async function main() {
   console.log("PROXIMITY CACHE — ACCURACY TEST (10,000 POINTS, WARM REDIS)");
   console.log("═".repeat(80));
   console.log(`Backend: ${BASE_URL}`);
-  console.log("Note: Redis NOT flushed — warm cache\n");
+  console.log("Note: Redis flushed before each variant — cold cache per test\n");
+  console.log("Note: Points with empty polygon sets (outside all polygons) are skipped\n");
 
   // 10,000 unique random points
   const testPoints = Array.from({ length: 10000 }, () => randomPointInSpain());
