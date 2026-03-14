@@ -19,9 +19,16 @@ Added `bounds_4326` column to `hierarchy_boundaries` via temporary SQL scripts:
 - `up.sql`: adds column, populates via `ST_Transform(bounds, 4326)`, creates GIST index
 - `down.sql`: removes column and index after experiment
 
+### Initial Run (single-run baseline)
 Tested 2 variants × 2 batch sizes = 4 experiments:
 - `single_baseline_vus=20` / `single_native_vus=20` — 1 point, 20 VUs
 - `batch-1000_baseline_vus=10` / `batch-1000_native_vus=10` — 1000 points, 10 VUs
+
+### Multi-trial VU Sweep (stability validation)
+Re-ran to validate consistency with 3 trials per configuration:
+- **Single-point**: VU levels 10, 20, 40 × 2 variants × 3 runs (some failed)
+- **Batch-1000**: VU levels 5, 10, 20 × 2 variants × 3 runs
+- Total: 36 experiments planned, ~18 completed successfully (54 min execution)
 
 ## How to Reproduce
 
@@ -38,7 +45,9 @@ psql postgresql://gis:gis@localhost:5432/gis -f experiments/12_srid_storage/down
 
 ## Results
 
-### Single-Point Lookups (20 VUs, 60s duration)
+### Initial Run (Single Experiment per Configuration)
+
+#### Single-Point Lookups (20 VUs, 60s duration)
 
 | Variant | Throughput | Avg Latency | P95 | P99 | Failure Rate |
 |---------|-----------|-------------|-----|-----|--------------|
@@ -47,7 +56,7 @@ psql postgresql://gis:gis@localhost:5432/gis -f experiments/12_srid_storage/down
 
 **Difference**: Native is **-2.3% throughput**, **+2.1% latency**
 
-### Batch-1000 Lookups (10 VUs, 60s duration)
+#### Batch-1000 Lookups (10 VUs, 60s duration)
 
 | Variant | Throughput | Avg Latency | P95 | P99 | Failure Rate |
 |---------|-----------|-------------|-----|-----|--------------|
