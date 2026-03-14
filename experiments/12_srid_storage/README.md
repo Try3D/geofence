@@ -92,26 +92,59 @@ The native approach trades **small accuracy loss** (1-4% edge cases) for no mean
 2. Accuracy degradation is real but random (different boundaries matched)
 3. Adds storage cost (extra geometry column + index)
 
+## Multi-Trial Results (VU Sweep)
+
+Re-ran the benchmark with 3 trials per configuration to assess consistency. However, some experiments (single-point, VU=40) encountered issues during execution. Available results:
+
+### Batch-1000 Lookups (3 runs each)
+
+#### VUs: 10
+
+| Variant | Throughput (req/s) | Avg Latency (ms) |
+|---------|------------------|------------------|
+| baseline | 9.95 (9.69–10.09) | 994 (980–1022) |
+| native | 9.46 (9.27–9.64) | 1047 (1026–1070) |
+| **Diff** | **-5.0%** | **+5.2%** |
+
+#### VUs: 20
+
+| Variant | Throughput (req/s) | Avg Latency (ms) |
+|---------|------------------|------------------|
+| baseline | 9.34 (9.27–9.39) | 2119 (2107–2137) |
+| native | 8.96 (8.91–9.01) | 2207 (2198–2219) |
+| **Diff** | **-4.1%** | **+4.2%** |
+
+### Observations
+
+The multi-trial results **contradict the initial single-run findings**:
+- **Initial test (VU=10)**: native +6.8% faster
+- **Multi-trial test (VU=10)**: baseline +5.0% faster
+
+This reversal suggests:
+1. The ~5% difference is within measurement variability and not consistent
+2. Noise/system variance at this scale makes the difference statistically uncertain
+3. Single-run conclusions were unreliable
+
 ## Conclusion
 
 **Recommendation: Do not implement SRID storage duality.**
 
-While the native (4326) approach shows **+6.8% improvement on batch-1000 queries**, it also shows **-2.3% degradation on single-point queries**. The mixed results suggest:
+The multi-trial benchmark reveals that the performance difference is **inconsistent and unreliable**:
 
-1. **Batch-scale gains are real but use-case dependent**: If your workload is heavily batch-oriented (1000+ points), native SRID provides measurable improvement.
+1. **Initial vs. multi-trial reversal**: First run showed native +6.8% on batch, multi-trial shows baseline +5%. This 12% swing indicates the difference is within noise levels.
 
-2. **Single-point penalty exists**: Likely due to subtle SRID handling differences in PostGIS, though both use the same GIST index.
+2. **Accuracy trade-off is not worth it**: Regardless of minor performance fluctuations, the 1-4% accuracy loss from round-trip precision (all 40K boundaries affected) outweighs any conditional performance gain.
 
-3. **Accuracy trade-off is not worth it**: The 1-4% accuracy loss from round-trip precision (all 40K boundaries affected) outweighs the conditional performance gain.
+3. **Real-world risk**: In production, a strategy based on a single favorable benchmark could prove counterproductive if the system behavior differs slightly (caching effects, query patterns, etc.).
 
-**Why not proceed despite batch gains?**
-- Performance difference is small (~7%) and inconsistent across workload profiles
-- Accuracy loss is systematic (affects all boundaries) not random
+**Why not proceed despite possible gains?**
+- Performance difference is too small and inconsistent to be reliable (±5% swing across runs)
+- Accuracy loss is systematic (affects all boundaries) and real
 - Storage cost (duplicate column + index) adds maintenance burden
-- The transform overhead was hypothesized to be large but is actually negligible—the gains come from subtle index behavior differences, not from eliminating an expensive operation
+- The transform overhead was hypothesized to be large but is actually negligible
 - Current approach is proven, simple, and perfectly adequate
 
-The current approach (transform at query time) remains optimal for typical mixed workloads.
+The current approach (transform at query time) remains optimal for typical mixed workloads. Invest optimization effort elsewhere.
 
 ## Limitations
 
