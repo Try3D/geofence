@@ -135,5 +135,9 @@ Experiments are numbered sequentially:
 - **exp-09**: JIT impact on query performance — negligible impact (<3%) on I/O-bound workloads
 - **exp-10**: Minimal payload optimization — 29% latency reduction via query projection optimization
 - **exp-11**: Hierarchy lookup optimization — 97-99% speedup with precomputed hierarchies
+- **exp-12**: SRID storage — native 4326 eliminates per-query ST_Transform overhead
+- **exp-13**: *(deleted — consolidated into exp-15)*
+- **exp-14**: *(deleted — consolidated into exp-15)*
+- **exp-15**: HTTP Runtime Shootout — Express, Fastify, Bun native, Bun+Elysia, Axum (serde_json), Axum (raw)
 
 **Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.

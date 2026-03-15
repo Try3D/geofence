@@ -1,0 +1,8 @@
+{
+  "name": "geofence-backend-fastify",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "fastify": "^5.3.0"
+  }
+}

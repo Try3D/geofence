@@ -21,6 +21,8 @@ experiments that drove the production configuration.
 | [09](experiments/09_jit_impact/) | JIT Impact | JIT has negligible impact (<3%) on I/O-bound spatial queries |
 | [10](experiments/10_minimal_payload/) | Minimal Payload | 29% latency reduction by optimizing query projection (IDs-only) |
 | [11](experiments/11_hierarchy_lookup/) | Hierarchy Lookup | 97-99% speedup with precomputed hierarchy (20.9ms vs 10,533ms) |
+| [12](experiments/12_srid_storage/) | SRID Storage | Native 4326 storage eliminates per-query ST_Transform overhead |
+| [15](experiments/15_runtime_shootout/) | Runtime Shootout | Bun+Elysia leads single-point (+8%); axum-raw serde bypass backfires (−5%); Bun/Axum win batch p95 (−25%) |
 
 Each experiment folder contains:
 - `README.md` — hypothesis, exact reproduction steps, results table, conclusion
@@ -42,7 +44,7 @@ geofence/
 │       ├── types/        ← Shared type definitions
 │       ├── utils/        ← Validators, error handling
 │       ├── queries/      ← Reusable SQL query builders
-│       └── routes/       ← Experiment-scoped endpoints (exp-01 through exp-11)
+│       └── routes/       ← Experiment-scoped endpoints (exp-01 through exp-12)
 ├── db/                   ← sqlx migrations
 ├── docker/               ← Dockerfiles
 ├── docker-compose.yml
