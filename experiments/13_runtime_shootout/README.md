@@ -1,4 +1,4 @@
-# 15 — HTTP Runtime Shootout
+# 13 — HTTP Runtime Shootout
 
 ## Hypothesis
 
@@ -36,9 +36,9 @@ FROM deepest_match WHERE rn = 1
 | Backend    | Runtime       | DB Driver                              | Port | Path                 |
 |------------|---------------|----------------------------------------|------|----------------------|
 | express    | Node.js v22   | `pg` (text protocol)                   | 3000 | `/exp/12/native`     |
-| fastify    | Node.js v22   | `pg` (text protocol)                   | 3002 | `/exp/15/fastify`    |
-| bun-native | Bun           | `postgres` (porsager, binary protocol) | 3003 | `/exp/15/bun-native` |
-| bun-elysia | Bun + Elysia  | `postgres` (porsager, binary protocol) | 3004 | `/exp/15/elysia`     |
+| fastify    | Node.js v22   | `pg` (text protocol)                   | 3002 | `/exp/13/fastify`    |
+| bun-native | Bun           | `postgres` (porsager, binary protocol) | 3003 | `/exp/13/bun-native` |
+| bun-elysia | Bun + Elysia  | `postgres` (porsager, binary protocol) | 3004 | `/exp/13/elysia`     |
 | axum       | Rust/Tokio    | `sqlx` — serde_json round-trip         | 3001 | `/exp/13/native`     |
 | axum-raw   | Rust/Tokio    | `sqlx` — raw bytes, no serde round-trip| 3001 | `/exp/13/native-raw` |
 
@@ -57,27 +57,27 @@ Each backend's single-point and batch tests run back-to-back before moving to th
 
 ```bash
 # Install deps for JS/TS backends
-cd experiments/15_runtime_shootout/backends/fastify   && npm install && cd -
-cd experiments/15_runtime_shootout/backends/bun-native && bun install && cd -
-cd experiments/15_runtime_shootout/backends/bun-elysia && bun install && cd -
+cd experiments/13_runtime_shootout/backends/fastify   && npm install && cd -
+cd experiments/13_runtime_shootout/backends/bun-native && bun install && cd -
+cd experiments/13_runtime_shootout/backends/bun-elysia && bun install && cd -
 
 # Terminal 1 — Express (Node.js, port 3000)
 cd backend && npm run dev
 
 # Terminal 2 — Axum + axum-raw (Rust, port 3001) — first build takes ~2 min
-cd experiments/15_runtime_shootout/backends/axum && cargo run --release
+cd experiments/13_runtime_shootout/backends/axum && cargo run --release
 
 # Terminal 3 — Fastify (Node.js, port 3002)
-cd experiments/15_runtime_shootout/backends/fastify && npx tsx server.ts
+cd experiments/13_runtime_shootout/backends/fastify && npx tsx server.ts
 
 # Terminal 4 — Bun native (port 3003)
-cd experiments/15_runtime_shootout/backends/bun-native && bun server.ts
+cd experiments/13_runtime_shootout/backends/bun-native && bun server.ts
 
 # Terminal 5 — Bun + Elysia (port 3004)
-cd experiments/15_runtime_shootout/backends/bun-elysia && bun server.ts
+cd experiments/13_runtime_shootout/backends/bun-elysia && bun server.ts
 
 # Terminal 6 — Run benchmark (~36 min)
-npx tsx experiments/15_runtime_shootout/run.ts
+npx tsx experiments/13_runtime_shootout/run.ts
 ```
 
 ## Results

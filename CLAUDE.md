@@ -136,8 +136,9 @@ Experiments are numbered sequentially:
 - **exp-10**: Minimal payload optimization — 29% latency reduction via query projection optimization
 - **exp-11**: Hierarchy lookup optimization — 97-99% speedup with precomputed hierarchies
 - **exp-12**: SRID storage — native 4326 eliminates per-query ST_Transform overhead
-- **exp-13**: *(deleted — consolidated into exp-15)*
-- **exp-14**: *(deleted — consolidated into exp-15)*
-- **exp-15**: HTTP Runtime Shootout — Express, Fastify, Bun native, Bun+Elysia, Axum (serde_json), Axum (raw)
+- **exp-13**: HTTP Runtime Shootout — Express, Fastify, Bun native, Bun+Elysia, Axum (serde_json), Axum (raw)
+- **exp-14**: ST_Covers vs ST_Contains — ST_Contains 0–1.59% faster; semantically correct for this workload
+- **exp-15**: Sorted Spatial Batches — Morton code Z-order sort before batch query — no meaningful gain
+- **exp-16**: Serialization Format — JSON vs JSON-flat vs Protocol Buffers — DB-bound; format doesn't matter
 
 **Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.

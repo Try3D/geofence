@@ -33,7 +33,7 @@ const QUERY = `
 
 const app = Fastify({ logger: true });
 
-app.post("/exp/15/fastify", async (req, reply) => {
+app.post("/exp/13/fastify", async (req, reply) => {
   try {
     const { points } = req.body as { points: Array<{ lon: number; lat: number }> };
     const lons = points.map((p) => p.lon);

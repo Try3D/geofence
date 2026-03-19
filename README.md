@@ -22,7 +22,10 @@ experiments that drove the production configuration.
 | [10](experiments/10_minimal_payload/) | Minimal Payload | 29% latency reduction by optimizing query projection (IDs-only) |
 | [11](experiments/11_hierarchy_lookup/) | Hierarchy Lookup | 97-99% speedup with precomputed hierarchy (20.9ms vs 10,533ms) |
 | [12](experiments/12_srid_storage/) | SRID Storage | Native 4326 storage eliminates per-query ST_Transform overhead |
-| [15](experiments/15_runtime_shootout/) | Runtime Shootout | Bun+Elysia leads single-point (+8%); axum-raw serde bypass backfires (−5%); Bun/Axum win batch p95 (−25%) |
+| [13](experiments/13_runtime_shootout/) | Runtime Shootout | Bun+Elysia leads single-point (+8%); axum-raw serde bypass backfires (−5%); Bun/Axum win batch p95 (−25%) |
+| [14](experiments/14_st_covers_vs_st_contains/) | ST_Covers vs ST_Contains | ST_Contains 0–1.59% faster; 100% accuracy parity (use ST_Contains) |
+| [15](experiments/15_sorted_spatial_batches/) | Sorted Spatial Batches | Morton code Z-order sort before batch query — cache locality hypothesis |
+| [16](experiments/16_serialization_format/) | Serialization Format | JSON vs JSON-flat vs Protocol Buffers — payload size and parse overhead |
 
 Each experiment folder contains:
 - `README.md` — hypothesis, exact reproduction steps, results table, conclusion
@@ -108,6 +111,12 @@ POST /exp/11/baseline           # Hierarchy lookup - full OSM scan baseline
 POST /exp/11/normal             # Hierarchy lookup - direct hierarchy_boundaries
 POST /exp/11/cte                # Hierarchy lookup - full ancestor path via CTE
 POST /exp/11/cte-fallback       # Hierarchy lookup - CTE with OSM fallback
+POST /exp/12/baseline           # SRID Storage - 3857 with transform
+POST /exp/12/native             # SRID Storage - 4326 native (no transform)
+POST /exp/16/contains           # ST_Contains spatial predicate
+POST /exp/16/covers             # ST_Covers spatial predicate
+POST /exp/17/unsorted           # Sorted batches - baseline (arrival order)
+POST /exp/17/geohash-sorted     # Sorted batches - Morton code Z-order sort
 ```
 
 ### Shared Utilities

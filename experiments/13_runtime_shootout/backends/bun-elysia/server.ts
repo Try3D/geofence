@@ -9,7 +9,7 @@ const sql = postgres(DB_URL, { max: 40 });
 
 new Elysia()
   .get("/health", () => ({ ok: true }))
-  .post("/exp/15/elysia", async ({ body }) => {
+  .post("/exp/13/elysia", async ({ body }) => {
     const { points } = body as { points: Array<{ lon: number; lat: number }> };
     const lons = points.map((p) => p.lon);
     const lats = points.map((p) => p.lat);

@@ -1,24 +1,24 @@
 #!/usr/bin/env node
 
 /**
- * exp-15: HTTP Runtime Shootout
+ * exp-13: HTTP Runtime Shootout
  *
  * Compares 5 backends executing identical SQL (native 4326, no transform):
  *   express    (Node.js + pg)          → port 3000  /exp/12/native
- *   fastify    (Node.js + pg)          → port 3002  /exp/15/fastify
- *   bun-native (Bun.serve + postgres)  → port 3003  /exp/15/bun-native
- *   bun-elysia (Bun + Elysia + postgres) → port 3004 /exp/15/elysia
+ *   fastify    (Node.js + pg)          → port 3002  /exp/13/fastify
+ *   bun-native (Bun.serve + postgres)  → port 3003  /exp/13/bun-native
+ *   bun-elysia (Bun + Elysia + postgres) → port 3004 /exp/13/elysia
  *   axum       (Rust/Tokio + sqlx)     → port 3001  /exp/13/native       (serde_json)
  *   axum-raw   (Rust/Tokio + sqlx)     → port 3001  /exp/13/native-raw   (raw bytes, no serde)
  *
  * Start all backends before running:
  *   cd backend && npm run dev
- *   cd experiments/15_runtime_shootout/backends/axum && cargo run --release
- *   cd experiments/15_runtime_shootout/backends/fastify && npx tsx server.ts
- *   cd experiments/15_runtime_shootout/backends/bun-native && bun server.ts
- *   cd experiments/15_runtime_shootout/backends/bun-elysia && bun server.ts
+ *   cd experiments/13_runtime_shootout/backends/axum && cargo run --release
+ *   cd experiments/13_runtime_shootout/backends/fastify && npx tsx server.ts
+ *   cd experiments/13_runtime_shootout/backends/bun-native && bun server.ts
+ *   cd experiments/13_runtime_shootout/backends/bun-elysia && bun server.ts
  *
- * Then: npx tsx experiments/15_runtime_shootout/run.ts
+ * Then: npx tsx experiments/13_runtime_shootout/run.ts
  *
  * Time estimate: 6 backends × 2 test types × 1 run × 3 min = 36 min
  */
@@ -41,9 +41,9 @@ const URLS = {
 
 const BACKENDS = [
   { name: "express",    url: `${URLS.express}/exp/12/native` },
-  { name: "fastify",    url: `${URLS.fastify}/exp/15/fastify` },
-  { name: "bun-native", url: `${URLS.bunNative}/exp/15/bun-native` },
-  { name: "bun-elysia", url: `${URLS.bunElysia}/exp/15/elysia` },
+  { name: "fastify",    url: `${URLS.fastify}/exp/13/fastify` },
+  { name: "bun-native", url: `${URLS.bunNative}/exp/13/bun-native` },
+  { name: "bun-elysia", url: `${URLS.bunElysia}/exp/13/elysia` },
   { name: "axum",       url: `${URLS.axum}/exp/13/native` },       // serde_json round-trip
   { name: "axum-raw",   url: `${URLS.axum}/exp/13/native-raw` },   // raw bytes, no serde
 ];
@@ -90,7 +90,7 @@ const k6Config: K6Config = {
 
 const bench = new Benchmark({
   name: "HTTP Runtime Shootout: Express vs Fastify vs Bun vs Axum",
-  resultsDir: path.join(ROOT, "benchmark-results", "15_runtime_shootout"),
+  resultsDir: path.join(ROOT, "benchmark-results", "13_runtime_shootout"),
   k6: k6Config,
   experiments: makeExperiments(),
 });

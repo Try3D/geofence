@@ -14,7 +14,7 @@ const server = Bun.serve({
     if (req.method === "GET" && pathname === "/health")
       return Response.json({ ok: true });
 
-    if (req.method === "POST" && pathname === "/exp/15/bun-native") {
+    if (req.method === "POST" && pathname === "/exp/13/bun-native") {
       const { points } = (await req.json()) as {
         points: Array<{ lon: number; lat: number }>;
       };
