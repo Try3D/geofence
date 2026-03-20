@@ -115,8 +115,6 @@ Each experiment README should include:
 7. Conclusion (clear recommendation)
 8. Limitations/notes (if any)
 
-**Important**: Only create `README.md` files. Never create separate documentation files like `LARGE_SCALE_VALIDATION.md` or similar. Put all conclusions, findings, and validation results directly in the main README.md file.
-
 ## File Creation Policy
 
 **NEVER write files other than READMEs.** All documentation, conclusions, validation results, and findings must go inside the experiment's `README.md` file. Do not create separate documentation files.
