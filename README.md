@@ -26,6 +26,8 @@ experiments that drove the production configuration.
 | [14](experiments/14_st_covers_vs_st_contains/) | ST_Covers vs ST_Contains | ST_Contains 0–1.59% faster; 100% accuracy parity (use ST_Contains) |
 | [15](experiments/15_sorted_spatial_batches/) | Sorted Spatial Batches | Morton code Z-order sort before batch query — cache locality hypothesis |
 | [16](experiments/16_serialization_format/) | Serialization Format | JSON vs JSON-flat vs Protocol Buffers — payload size and parse overhead |
+| [17](experiments/17_approx_spatial_indexes/) | Approx Spatial Indexes | GIST vs SP-GiST vs BRIN — space-partitioning and block-range index comparison |
+| [18](experiments/18_optimized_aggregate/) | Optimized Aggregate | All winning optimizations combined — 11.9× faster single-point, 30× faster batch vs naive baseline |
 
 Each experiment folder contains:
 - `README.md` — hypothesis, exact reproduction steps, results table, conclusion

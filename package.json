@@ -8,6 +8,7 @@
   ],
   "dependencies": {
     "@geofence/profiler": "*",
-    "pg": "^8.20.0"
+    "pg": "^8.20.0",
+    "protobufjs": "^8.0.0"
   }
 }
