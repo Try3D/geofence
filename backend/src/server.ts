@@ -4,6 +4,7 @@ import express, {
   type Request,
   type Response,
 } from "express";
+import { register, httpRequestDuration } from "./metrics";
 import healthRoutes from "./routes/health";
 import exp01Routes from "./routes/exp-01";
 import exp02Routes from "./routes/exp-02";
@@ -26,6 +27,24 @@ import exp18Routes from "./routes/exp-18";
 const app = express();
 app.use(express.json({ limit: "2mb" }));
 const port = Number(process.env.PORT || 3000);
+
+// Prometheus metrics middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const start = Date.now();
+  res.on("finish", () => {
+    const route = req.route ? req.baseUrl + req.route.path : "unknown";
+    httpRequestDuration.observe(
+      { method: req.method, route, status_code: String(res.statusCode) },
+      (Date.now() - start) / 1000
+    );
+  });
+  next();
+});
+
+app.get("/metrics", async (_req: Request, res: Response) => {
+  res.set("Content-Type", register.contentType);
+  res.end(await register.metrics());
+});
 
 // Route registration
 app.use("/health", healthRoutes);

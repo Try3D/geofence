@@ -1,0 +1,139 @@
+{
+  "title": "Geofence Backend",
+  "uid": "geofence-backend",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "timepicker": {},
+  "panels": [
+    {
+      "id": 1,
+      "title": "Request Rate (req/s)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 0, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "sum(rate(http_request_duration_seconds_count[1m])) by (route)",
+          "legendFormat": "{{ route }}"
+        }
+      ],
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 2,
+      "title": "Request Latency Percentiles",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 0, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, route))",
+          "legendFormat": "p50 {{ route }}"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, route))",
+          "legendFormat": "p95 {{ route }}"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket[1m])) by (le, route))",
+          "legendFormat": "p99 {{ route }}"
+        }
+      ],
+      "options": { "tooltip": { "mode": "multi" } }
+    },
+    {
+      "id": 3,
+      "title": "Node.js Heap Memory",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "bytes", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "nodejs_heap_size_used_bytes",
+          "legendFormat": "heap used"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "nodejs_heap_size_total_bytes",
+          "legendFormat": "heap total"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Event Loop Lag (p99)",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "s", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "nodejs_eventloop_lag_p99_seconds",
+          "legendFormat": "event loop lag p99"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "nodejs_eventloop_lag_mean_seconds",
+          "legendFormat": "event loop lag mean"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Error Rate",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"5..\"}[1m])) by (route)",
+          "legendFormat": "5xx {{ route }}"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "sum(rate(http_request_duration_seconds_count{status_code=~\"4..\"}[1m])) by (route)",
+          "legendFormat": "4xx {{ route }}"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "title": "Active Handles & CPU",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "fieldConfig": {
+        "defaults": { "custom": { "lineWidth": 2 } }
+      },
+      "targets": [
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "nodejs_active_handles_total",
+          "legendFormat": "active handles"
+        },
+        {
+          "datasource": { "uid": "prometheus" },
+          "expr": "rate(process_cpu_seconds_total[1m]) * 100",
+          "legendFormat": "CPU %"
+        }
+      ]
+    }
+  ]
+}
