@@ -120,25 +120,3 @@ Each experiment README should include:
 ## File Creation Policy
 
 **NEVER write files other than READMEs.** All documentation, conclusions, validation results, and findings must go inside the experiment's `README.md` file. Do not create separate documentation files.
-
-## Experiment Numbering
-
-Experiments are numbered sequentially:
-- **exp-01**: Connection pooling — API pool=15, PgBouncer=25 optimal
-- **exp-02**: Batch vs single queries — single-point parallelizes better
-- **exp-03**: Parallel batch processing — Promise.all chunking 2.48× speedup
-- **exp-04**: Geometry simplification — simple_10 (10m): 2.48× speedup
-- **exp-05**: Batch algorithms — JSON expansion 3.8% faster than temp table
-- **exp-06**: Spatial tile cache — negative result (overhead > gains)
-- **exp-07**: Bounding box filter optimization — 4.4% large-batch, 368% small-batch gains
-- **exp-08**: SQL functions for batch queries — query precompilation optimization
-- **exp-09**: JIT impact on query performance — negligible impact (<3%) on I/O-bound workloads
-- **exp-10**: Minimal payload optimization — 29% latency reduction via query projection optimization
-- **exp-11**: Hierarchy lookup optimization — 97-99% speedup with precomputed hierarchies
-- **exp-12**: SRID storage — native 4326 eliminates per-query ST_Transform overhead
-- **exp-13**: HTTP Runtime Shootout — Express, Fastify, Bun native, Bun+Elysia, Axum (serde_json), Axum (raw)
-- **exp-14**: ST_Covers vs ST_Contains — ST_Contains 0–1.59% faster; semantically correct for this workload
-- **exp-15**: Sorted Spatial Batches — Morton code Z-order sort before batch query — no meaningful gain
-- **exp-16**: Serialization Format — JSON vs JSON-flat vs Protocol Buffers — DB-bound; format doesn't matter
-
-**Important**: Always number experiments in order. Do not skip numbers or jump ahead. If you create a new experiment, check the highest number and increment by 1.
